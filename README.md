@@ -81,6 +81,45 @@ func main() {
 }
 ```
 
+### Key Derivation (KDF)
+
+Derive session keys for EAP-AKA (RFC 4187) and EAP-AKA' (RFC 5448).
+
+```go
+// EAP-AKA' Example
+identity := "0555444333222111"
+ck := ... // from USIM
+ik := ... // from USIM
+netName := "WLAN"
+
+// 1. Derive CK', IK' (RFC 5448)
+ckPrime, ikPrime := eapaka.DeriveCKPrimeIKPrime(ck, ik, netName)
+
+// 2. Derive Master Keys (K_encr, K_aut, MSK, EMSK)
+keys := eapaka.DeriveKeysAKAPrime(identity, ckPrime, ikPrime)
+
+fmt.Printf("MSK: %x\n", keys.MSK)
+```
+
+**Note on EAP-AKA' KDF**: There is a known discrepancy between the RFC 5448 Appendix C test vectors and the output of `DeriveCKPrimeIKPrime`/`DeriveKeysAKAPrime`. This implementation matches the logic found in other major implementations (e.g., free5GC) and strictly follows the RFC text. See `kdf_test.go` for details.
+
+### MS-MPPE-Key Encryption
+
+Encrypt the `MS-MPPE-Send-Key` and `MS-MPPE-Recv-Key` attributes for RADIUS.
+
+```go
+// Split MSK into Send/Recv keys
+sendKey := keys.MSK[0:32]
+recvKey := keys.MSK[32:64]
+
+// Encrypt keys (requires RADIUS shared secret and Request Authenticator)
+secret := []byte("radius-secret")
+reqAuth := ... // 16 bytes from RADIUS Access-Request
+
+encSendKey, _ := eapaka.EncryptMPPEKey(sendKey, secret, reqAuth)
+encRecvKey, _ := eapaka.EncryptMPPEKey(recvKey, secret, reqAuth)
+```
+
 ## Supported Attributes
 
 **Note**: This library handles the attribute headers (Type and Length) and padding. For the attribute value (data), you must construct the byte slice yourself according to the RFC definitions and assign it to the corresponding field (e.g., `Rand`, `Autn`, `Identity`).

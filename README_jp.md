@@ -83,6 +83,45 @@ func main() {
 }
 ```
 
+### 鍵導出 (KDF)
+
+EAP-AKA (RFC 4187) および EAP-AKA' (RFC 5448) 用のセッション鍵を導出します。
+
+```go
+// EAP-AKA' の例
+identity := "0555444333222111"
+ck := ... // USIMから取得
+ik := ... // USIMから取得
+netName := "WLAN"
+
+// 1. CK', IK' の導出 (RFC 5448)
+ckPrime, ikPrime := eapaka.DeriveCKPrimeIKPrime(ck, ik, netName)
+
+// 2. マスターキー (K_encr, K_aut, MSK, EMSK) の導出
+keys := eapaka.DeriveKeysAKAPrime(identity, ckPrime, ikPrime)
+
+fmt.Printf("MSK: %x\n", keys.MSK)
+```
+
+**EAP-AKA' KDF に関する注意**: RFC 5448 Appendix C のテストベクタと、本ライブラリの `DeriveCKPrimeIKPrime`/`DeriveKeysAKAPrime` の出力値には不一致があります。本実装は `free5GC` 等の主要な実装とロジックを合わせ、RFC 本文の記述に厳密に従っています。詳細は `kdf_test.go` を参照してください。
+
+### MS-MPPE-Key 暗号化
+
+RADIUS 属性 `MS-MPPE-Send-Key` および `MS-MPPE-Recv-Key` 用の暗号化を行います。
+
+```go
+// MSK を Send/Recv キーに分割
+sendKey := keys.MSK[0:32]
+recvKey := keys.MSK[32:64]
+
+// 鍵の暗号化 (RADIUS 共有シークレットと Request Authenticator が必要)
+secret := []byte("radius-secret")
+reqAuth := ... // RADIUS Access-Request から取得した 16バイト
+
+encSendKey, _ := eapaka.EncryptMPPEKey(sendKey, secret, reqAuth)
+encRecvKey, _ := eapaka.EncryptMPPEKey(recvKey, secret, reqAuth)
+```
+
 ## サポートしている属性
 
 **注意**: 本ライブラリは属性ヘッダー (Type, Length) とパディングの処理のみを行います。属性値（データ部分）については、RFCの定義に従って利用者自身がバイト列を構築し、対応するフィールド（`Rand`, `Autn`, `Identity` 等）に格納する必要があります。

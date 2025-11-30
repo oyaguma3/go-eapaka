@@ -35,6 +35,18 @@ To create and marshal a packet:
 	err := pkt.CalculateAndSetMac(kAut)
 
 	data, err := pkt.Marshal()
+	if err != nil {
+		// handle error
+	}
+
+To derive keys (EAP-AKA'):
+
+	ckPrime, ikPrime := eapaka.DeriveCKPrimeIKPrime(ck, ik, "WLAN")
+	keys := eapaka.DeriveKeysAKAPrime(identity, ckPrime, ikPrime)
+
+To encrypt MS-MPPE-Keys:
+
+	encKey, err := eapaka.EncryptMPPEKey(keys.MSK[:32], secret, reqAuth)
 
 # References
 
