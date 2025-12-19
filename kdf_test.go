@@ -101,27 +101,42 @@ func TestDeriveKeysAKAPrime_RFC5448_Case2(t *testing.T) {
 */
 
 func TestEncryptMPPEKey(t *testing.T) {
-	key := make([]byte, 32) // Half of MSK
+	// Case 1: Key length 32
+	// P = Length(1) + Key(32) + Padding(?)
+	// P len must be multiple of 16. 1+32=33. Next multiple is 48.
+	// Padding = 15 bytes. Total P = 48 bytes.
+	// Result = Salt(2) + P(48) = 50 bytes.
+	key32 := make([]byte, 32)
 	secret := []byte("radius-secret")
 	reqAuth := make([]byte, 16)
 
-	encrypted, err := EncryptMPPEKey(key, secret, reqAuth)
+	encrypted, err := EncryptMPPEKey(key32, secret, reqAuth)
 	if err != nil {
 		t.Fatalf("EncryptMPPEKey failed: %v", err)
 	}
 
-	// Salt(2) + Length(1) + Key(32) + Padding(?) = Multiple of 16
-	// 2 + 1 + 32 = 35. Next multiple of 16 is 48.
-	// So expected length is 48.
-
-	expectedLen := 48
-	if len(encrypted) != expectedLen {
-		t.Errorf("Encrypted length mismatch: got %d, want %d", len(encrypted), expectedLen)
+	expectedLen32 := 2 + 48
+	if len(encrypted) != expectedLen32 {
+		t.Errorf("Encrypted length mismatch (key32): got %d, want %d", len(encrypted), expectedLen32)
 	}
-
-	// Check Salt MSB
 	if (encrypted[0] & 0x80) == 0 {
 		t.Error("Salt MSB is not set")
+	}
+
+	// Case 2: Key length 7
+	// P = Length(1) + Key(7) + Padding(?)
+	// P len must be multiple of 16. 1+7=8. Next multiple is 16.
+	// Padding = 8 bytes. Total P = 16 bytes.
+	// Result = Salt(2) + P(16) = 18 bytes.
+	key7 := make([]byte, 7)
+	encrypted7, err := EncryptMPPEKey(key7, secret, reqAuth)
+	if err != nil {
+		t.Fatalf("EncryptMPPEKey (key7) failed: %v", err)
+	}
+
+	expectedLen7 := 2 + 16
+	if len(encrypted7) != expectedLen7 {
+		t.Errorf("Encrypted length mismatch (key7): got %d, want %d", len(encrypted7), expectedLen7)
 	}
 }
 

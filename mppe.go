@@ -17,6 +17,9 @@ func EncryptMPPEKey(key []byte, secret []byte, reqAuth []byte) ([]byte, error) {
 	if len(key) == 0 || len(key) > 255 {
 		return nil, errors.New("eapaka: invalid key length for MPPE encryption")
 	}
+	if len(reqAuth) != 16 {
+		return nil, errors.New("eapaka: invalid Request Authenticator length")
+	}
 
 	// 1. Generate Salt (2 bytes)
 	// "The most significant bit ... MUST be set"
@@ -28,16 +31,14 @@ func EncryptMPPEKey(key []byte, secret []byte, reqAuth []byte) ([]byte, error) {
 
 	// 2. Prepare Plaintext
 	// Structure: [Length(1)] + [Key] + [Padding]
-	// RFC 2548: "The length of the salt + length + key + padding must be a multiple of 16"
-
+	// RFC 2548: "The length of the ... length + key + padding must be a multiple of 16"
+	// Note: RFC says "salt + length + key + padding", but the salt is NOT encrypted.
+	// The encrypted portion P is [Length + Key + Padding].
+	
 	plainLen := 1 + len(key)
-
-	// Calculate total length needed (Salt + Plaintext)
-	totalLen := 2 + plainLen
-	padLen := 0
-	if totalLen%16 != 0 {
-		padLen = 16 - (totalLen % 16)
-	}
+	
+	// Calculate padding needed to make P a multiple of 16
+	padLen := (16 - (plainLen % 16)) % 16
 
 	// Construct buffer
 	plaintext := make([]byte, plainLen+padLen)
@@ -59,21 +60,15 @@ func EncryptMPPEKey(key []byte, secret []byte, reqAuth []byte) ([]byte, error) {
 	b := h.Sum(nil) // 16 bytes
 
 	// c(i) = p(i) ^ b(i)
-	cipherOffset := 2
+	// Encrypted blocks start at offset 2 in result
+	
 	for i := 0; i < len(plaintext); i += 16 {
-		// Handle last block which might be less than 16 bytes
-		end := i + 16
-		if end > len(plaintext) {
-			end = len(plaintext)
-		}
-		pBlock := plaintext[i:end]
-		cBlock := make([]byte, len(pBlock))
+		pBlock := plaintext[i : i+16]
+		cBlock := result[2+i : 2+i+16] // Write directly to result
 
-		for j := 0; j < len(pBlock); j++ {
+		for j := 0; j < 16; j++ {
 			cBlock[j] = pBlock[j] ^ b[j]
 		}
-
-		copy(result[cipherOffset+i:], cBlock)
 
 		// Prepare b(i+1) = MD5(Secret + c(i))
 		h.Reset()
