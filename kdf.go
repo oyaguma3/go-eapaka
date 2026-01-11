@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha1"
 	"crypto/sha256"
+	"errors"
 )
 
 // AkaKeys holds the key material derived for EAP-AKA (RFC 4187).
@@ -72,51 +73,44 @@ func DeriveKeysAKAPrime(identity string, ckPrime, ikPrime []byte) AkaPrimeKeys {
 	}
 }
 
-// DeriveCKPrimeIKPrime derives CK' and IK' from CK, IK and Access Network Name.
-// RFC 5448 Section 3.1 & 3.2.
-// netName: Typically "WLAN" for Wi-Fi calling.
-func DeriveCKPrimeIKPrime(ck, ik []byte, netName string) (ckPrime, ikPrime []byte) {
-	// Access Network Identity
-	anId := []byte(netName)
-
-	// Key for PRF' is IK|CK
-	key := append(append([]byte{}, ik...), ck...)
-
-	// S = FC | P0 | L0 | P1 | L1 ...
-	// FC = 0x20 for CK', 0x21 for IK'
-	// P0 = "EAP-AKA'"
-	// P1 = Access Network Identity (netName)
-
-	mkSeed := func(fc byte) []byte {
-		// RFC 5448 Section 3.1
-		// S = FC || "EAP-AKA'" || len("EAP-AKA'") || AN-ID || len(AN-ID)
-		// Note: Lengths are 2-byte integers (big endian)
-
-		s := make([]byte, 0, 1+8+2+len(anId)+2)
-		s = append(s, fc)
-		s = append(s, []byte("EAP-AKA'")...)
-		s = append(s, 0x00, 0x08) // len("EAP-AKA'") = 8
-		s = append(s, anId...)
-		// len(anId)
-		l := uint16(len(anId))
-		s = append(s, byte(l>>8), byte(l))
-		return s
+// DeriveCKPrimeIKPrime derives CK' and IK' from CK, IK, AUTN, and Access Network Name.
+// RFC 9048 Section 3.3 and TS 33.402 Annex A.2.
+// netName: Access Network Name (AT_KDF_INPUT).
+// autn: AUTN from the AKA run; SQN xor AK is derived from autn[0:6].
+func DeriveCKPrimeIKPrime(ck, ik []byte, netName string, autn []byte) (ckPrime, ikPrime []byte, err error) {
+	if len(ck) != 16 || len(ik) != 16 {
+		return nil, nil, errors.New("CK and IK must be 16 bytes")
+	}
+	if len(autn) < 6 {
+		return nil, nil, errors.New("AUTN must be at least 6 bytes")
+	}
+	if netName == "" {
+		return nil, nil, errors.New("AT_KDF_INPUT must be non-empty")
 	}
 
-	// Output length of PRF' is 32 bytes (SHA-256), but CK'/IK' are 128-bit (16 bytes) ?
-	// RFC 5448 Section 3.1: "CK' ... is the first 128 bits"
+	// SQN xor AK is the first 6 bytes of AUTN.
+	sqnXorAk := autn[:6]
 
-	// CK' calculation
-	seedCk := mkSeed(0x20)
-	fullCk := prfPlusIKEv2(key, seedCk, 32)
-	ckPrime = fullCk[:16]
+	// Key for KDF is CK || IK.
+	key := append(append([]byte{}, ck...), ik...)
 
-	// IK' calculation
-	seedIk := mkSeed(0x21)
-	fullIk := prfPlusIKEv2(key, seedIk, 32)
-	ikPrime = fullIk[:16]
+	// S = FC || P0 || L0 || P1 || L1
+	// FC = 0x20, P0 = Network Name, P1 = SQN xor AK.
+	s := make([]byte, 0, 1+len(netName)+2+6+2)
+	s = append(s, 0x20)
+	s = append(s, []byte(netName)...)
+	netLen := uint16(len(netName))
+	s = append(s, byte(netLen>>8), byte(netLen))
+	s = append(s, sqnXorAk...)
+	sqnLen := uint16(len(sqnXorAk))
+	s = append(s, byte(sqnLen>>8), byte(sqnLen))
 
-	return ckPrime, ikPrime
+	h := hmac.New(sha256.New, key)
+	h.Write(s)
+	out := h.Sum(nil)
+	ckPrime = out[:16]
+	ikPrime = out[16:32]
+	return ckPrime, ikPrime, nil
 }
 
 // -----------------------------------------------------------------------------

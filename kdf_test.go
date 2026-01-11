@@ -36,30 +36,27 @@ func TestDeriveKeysAKA(t *testing.T) {
 }
 
 func TestDeriveKeysAKAPrime_RFC5448_Case1(t *testing.T) {
-	// RFC 5448 Appendix C Case 1
+	// RFC 9048 Appendix D Case 1
 	identity := "0555444333222111"
 	netName := "WLAN"
 	ik := h("9744871ad32bf9bbd1dd5ce54e3e2e5a")
 	ck := h("5349fbe098649f948f5d2e973a81c00f")
+	autn := h("bb52e91c747ac3ab2a5c23d15ee351d5")
 
 	// Expected Derived Keys
-	// Expected Derived Keys
-	// NOTE: Values differ from RFC 5448 Appendix C.
-	// Implementation follows RFC 5448 Sec 3.1/3.3 and matches free5GC.
-	// Discrepancy likely due to RFC test vector ambiguity.
-	// Values below are from current implementation.
-	// RFC Value for CK': 0093962d0dd84aa5684b045c9edffa04
-	expCkPrime := h("9c43471186e35b979d9150cb38484e80")
-	expIkPrime := h("0d245437946bd429cadc604f52800620")
-	expKEncr := h("59aacb520a8eac05210c3c5a2784c85d")
-	expKAut := h("ca760c9e159fb5d5c17b99dd8fa63fd1590bc04c19c9228f8c13b840fd20ea")
-	expKRe := h("11fdaea8e409f1d51d0bdd54004341a378f1ca54585a0cc4bd591ccca4ab44")
-	expMSK := h("d21ba59961ff6912270d615df4c74ef6765deee52d3f4b823bc9a9724ac5361740e49cdab5ef010b0a6971e874b477feca02bc51608e35f03b5d9b606b7219a")
-	// expEMSK is placeholder, we will check it matches what we get or just ignore for now
-	// expEMSK := h("...")
+	expCkPrime := h("0093962d0dd84aa5684b045c9edffa04")
+	expIkPrime := h("ccfc230ca74fcc96c0a5d61164f5a76c")
+	expKEncr := h("766fa0a6c317174b812d52fbcd11a179")
+	expKAut := h("0842ea722ff6835bfa2032499fc3ec23c2f0e388b4f07543ffc677f1696d71ea")
+	expKRe := h("cf83aa8bc7e0aced892acc98e76a9b2095b558c7795c7094715cb3393aa7d17a")
+	expMSK := h("67c42d9aa56c1b79e295e3459fc3d187d42be0bf818d3070e362c5e967a4d544e8ecfe19358ab3039aff03b7c930588c055babee58a02650b067ec4e9347c75a")
+	expEMSK := h("f861703cd775590e16c7679ea3874ada866311de290764d760cf76df647ea01c313f69924bdd7650ca9bac141ea075c4ef9e8029c0e290cdbad5638b63bc23fb")
 
 	// 1. Derive CK', IK'
-	ckPrime, ikPrime := DeriveCKPrimeIKPrime(ck, ik, netName)
+	ckPrime, ikPrime, err := DeriveCKPrimeIKPrime(ck, ik, netName, autn)
+	if err != nil {
+		t.Fatalf("DeriveCKPrimeIKPrime failed: %v", err)
+	}
 
 	if !bytes.Equal(ckPrime, expCkPrime) {
 		t.Errorf("CK' mismatch\nGot: %x\nWant: %x", ckPrime, expCkPrime)
@@ -74,23 +71,18 @@ func TestDeriveKeysAKAPrime_RFC5448_Case1(t *testing.T) {
 	if !bytes.Equal(keys.K_encr, expKEncr) {
 		t.Errorf("K_encr mismatch\nGot: %x\nWant: %x", keys.K_encr, expKEncr)
 	}
-	/*
-		if !bytes.Equal(keys.K_aut, expKAut) {
-			t.Errorf("K_aut mismatch\nGot: %x\nWant: %x", keys.K_aut, expKAut)
-		}
-	*/
-	_ = expKAut
-	/*
-		if !bytes.Equal(keys.K_re, expKRe) {
-			t.Errorf("K_re mismatch\nGot: %x\nWant: %x", keys.K_re, expKRe)
-		}
-		if !bytes.Equal(keys.MSK, expMSK) {
-			t.Errorf("MSK mismatch\nGot: %x\nWant: %x", keys.MSK, expMSK)
-		}
-	*/
-	_ = expKRe
-	_ = expMSK
-	// Not checking EMSK yet as it wasn't in the failure output fully
+	if !bytes.Equal(keys.K_aut, expKAut) {
+		t.Errorf("K_aut mismatch\nGot: %x\nWant: %x", keys.K_aut, expKAut)
+	}
+	if !bytes.Equal(keys.K_re, expKRe) {
+		t.Errorf("K_re mismatch\nGot: %x\nWant: %x", keys.K_re, expKRe)
+	}
+	if !bytes.Equal(keys.MSK, expMSK) {
+		t.Errorf("MSK mismatch\nGot: %x\nWant: %x", keys.MSK, expMSK)
+	}
+	if !bytes.Equal(keys.EMSK, expEMSK) {
+		t.Errorf("EMSK mismatch\nGot: %x\nWant: %x", keys.EMSK, expEMSK)
+	}
 }
 
 /*

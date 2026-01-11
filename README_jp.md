@@ -109,10 +109,11 @@ EAP-AKA (RFC 4187) および EAP-AKA' (RFC 5448) 用のセッション鍵を導�
 identity := "0555444333222111"
 ck := ... // USIMから取得
 ik := ... // USIMから取得
+autn := ... // USIMから取得
 netName := "WLAN"
 
-// 1. CK', IK' の導出 (RFC 5448)
-ckPrime, ikPrime := eapaka.DeriveCKPrimeIKPrime(ck, ik, netName)
+// 1. CK', IK' の導出 (RFC 9048 / TS 33.402)
+ckPrime, ikPrime, _ := eapaka.DeriveCKPrimeIKPrime(ck, ik, netName, autn)
 
 // 2. マスターキー (K_encr, K_aut, MSK, EMSK) の導出
 keys := eapaka.DeriveKeysAKAPrime(identity, ckPrime, ikPrime)
@@ -120,7 +121,7 @@ keys := eapaka.DeriveKeysAKAPrime(identity, ckPrime, ikPrime)
 fmt.Printf("MSK: %x\n", keys.MSK)
 ```
 
-**EAP-AKA' KDF に関する注意**: RFC 5448 Appendix C のテストベクタと、本ライブラリの `DeriveCKPrimeIKPrime`/`DeriveKeysAKAPrime` の出力値には不一致があります。本実装は `free5GC` 等の主要な実装とロジックを合わせ、RFC 本文の記述に厳密に従っています。詳細は `kdf_test.go` を参照してください。
+**EAP-AKA' KDF に関する注意**: `DeriveCKPrimeIKPrime` は TS 33.402 Annex A.2 に準拠し、RFC 9048 Appendix D のテストベクタに一致します。詳細は `kdf_test.go` を参照してください。
 
 ### MS-MPPE-Key 暗号化
 

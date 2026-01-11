@@ -107,10 +107,11 @@ Derive session keys for EAP-AKA (RFC 4187) and EAP-AKA' (RFC 5448).
 identity := "0555444333222111"
 ck := ... // from USIM
 ik := ... // from USIM
+autn := ... // from USIM
 netName := "WLAN"
 
-// 1. Derive CK', IK' (RFC 5448)
-ckPrime, ikPrime := eapaka.DeriveCKPrimeIKPrime(ck, ik, netName)
+// 1. Derive CK', IK' (RFC 9048 / TS 33.402)
+ckPrime, ikPrime, _ := eapaka.DeriveCKPrimeIKPrime(ck, ik, netName, autn)
 
 // 2. Derive Master Keys (K_encr, K_aut, MSK, EMSK)
 keys := eapaka.DeriveKeysAKAPrime(identity, ckPrime, ikPrime)
@@ -118,7 +119,7 @@ keys := eapaka.DeriveKeysAKAPrime(identity, ckPrime, ikPrime)
 fmt.Printf("MSK: %x\n", keys.MSK)
 ```
 
-**Note on EAP-AKA' KDF**: There is a known discrepancy between the RFC 5448 Appendix C test vectors and the output of `DeriveCKPrimeIKPrime`/`DeriveKeysAKAPrime`. This implementation matches the logic found in other major implementations (e.g., free5GC) and strictly follows the RFC text. See `kdf_test.go` for details.
+**Note on EAP-AKA' KDF**: `DeriveCKPrimeIKPrime` follows TS 33.402 Annex A.2 and matches RFC 9048 Appendix D test vectors. See `kdf_test.go` for details.
 
 ### MS-MPPE-Key Encryption
 

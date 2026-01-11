@@ -41,7 +41,8 @@ To create and marshal a packet:
 
 To derive keys (EAP-AKA'):
 
-	ckPrime, ikPrime := eapaka.DeriveCKPrimeIKPrime(ck, ik, "WLAN")
+	autn := ... // from USIM/HSS
+	ckPrime, ikPrime, err := eapaka.DeriveCKPrimeIKPrime(ck, ik, "WLAN", autn)
 	keys := eapaka.DeriveKeysAKAPrime(identity, ckPrime, ikPrime)
 
 To encrypt MS-MPPE-Keys:
