@@ -9,36 +9,38 @@ import (
 	"hash"
 )
 
+func (p *Packet) findMacAttr() (*AtMac, error) {
+	for i := range p.Attributes {
+		if m, ok := p.Attributes[i].(*AtMac); ok {
+			return m, nil
+		}
+	}
+	return nil, errors.New("AT_MAC attribute not found")
+}
+
+func zeroMac(macAttr *AtMac) {
+	macAttr.MAC = make([]byte, 16)
+}
+
+func snapshotMac(macAttr *AtMac) []byte {
+	receivedMac := make([]byte, 16)
+	copy(receivedMac, macAttr.MAC)
+	return receivedMac
+}
+
 // CalculateAndSetMac calculates the MAC for the packet and updates the AT_MAC attribute.
 // It requires the K_aut key.
 func (p *Packet) CalculateAndSetMac(kAut []byte) error {
 	// 1. Find AT_MAC and zero it out
-	var macAttr *AtMac
-	found := false
-	for i := range p.Attributes {
-		if m, ok := p.Attributes[i].(*AtMac); ok {
-			macAttr = m
-			found = true
-			break
-		}
+	macAttr, err := p.findMacAttr()
+	if err != nil {
+		return err
 	}
-
-	if !found {
-		return errors.New("AT_MAC attribute not found")
-	}
-
-	// Save original MAC just in case (though we are overwriting it)
-	// We need to zero it out for calculation
-	originalMac := make([]byte, 16)
-	if len(macAttr.MAC) == 16 {
-		copy(originalMac, macAttr.MAC)
-	}
-	macAttr.MAC = make([]byte, 16) // Zeroed
+	zeroMac(macAttr)
 
 	// 2. Marshal packet
 	data, err := p.Marshal()
 	if err != nil {
-		// Restore?
 		return err
 	}
 
@@ -56,25 +58,14 @@ func (p *Packet) CalculateAndSetMac(kAut []byte) error {
 // VerifyMac verifies the MAC in the packet against the provided K_aut.
 func (p *Packet) VerifyMac(kAut []byte) (bool, error) {
 	// 1. Find AT_MAC
-	var macAttr *AtMac
-	found := false
-	for i := range p.Attributes {
-		if m, ok := p.Attributes[i].(*AtMac); ok {
-			macAttr = m
-			found = true
-			break
-		}
+	macAttr, err := p.findMacAttr()
+	if err != nil {
+		return false, err
 	}
-
-	if !found {
-		return false, errors.New("AT_MAC attribute not found")
-	}
-
-	receivedMac := make([]byte, 16)
-	copy(receivedMac, macAttr.MAC)
+	receivedMac := snapshotMac(macAttr)
 
 	// 2. Zero out AT_MAC for calculation
-	macAttr.MAC = make([]byte, 16)
+	zeroMac(macAttr)
 
 	// 3. Marshal
 	data, err := p.Marshal()

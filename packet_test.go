@@ -95,30 +95,31 @@ func TestPacket_Success(t *testing.T) {
 	}
 }
 
-func TestParse_InvalidLengthTooSmall(t *testing.T) {
-	// Length field is less than 4 (EAP header size)
-	data := []byte{eapaka.CodeRequest, 1, 0x00, 0x03}
-
-	if _, err := eapaka.Parse(data); err == nil {
-		t.Fatal("expected error for invalid length < 4")
+func TestParse_InvalidPackets(t *testing.T) {
+	testCases := []struct {
+		name string
+		data []byte
+	}{
+		{
+			name: "length_too_small",
+			data: []byte{eapaka.CodeRequest, 1, 0x00, 0x03},
+		},
+		{
+			name: "success_with_payload",
+			data: []byte{eapaka.CodeSuccess, 1, 0x00, 0x05, 0x00},
+		},
+		{
+			name: "request_missing_type",
+			data: []byte{eapaka.CodeRequest, 1, 0x00, 0x04},
+		},
 	}
-}
 
-func TestParse_SuccessWithPayload(t *testing.T) {
-	// Success packet must not include payload
-	data := []byte{eapaka.CodeSuccess, 1, 0x00, 0x05, 0x00}
-
-	if _, err := eapaka.Parse(data); err == nil {
-		t.Fatal("expected error for success packet with payload")
-	}
-}
-
-func TestParse_RequestMissingType(t *testing.T) {
-	// Request packet must include a Type
-	data := []byte{eapaka.CodeRequest, 1, 0x00, 0x04}
-
-	if _, err := eapaka.Parse(data); err == nil {
-		t.Fatal("expected error for request packet without type")
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := eapaka.Parse(tc.data); err == nil {
+				t.Fatal("expected error for invalid packet")
+			}
+		})
 	}
 }
 

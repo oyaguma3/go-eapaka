@@ -41,6 +41,72 @@ func marshalAttribute(t AttributeType, data []byte) ([]byte, error) {
 	return b, nil
 }
 
+func marshalFixedLenAttribute(t AttributeType, data []byte, wantLen int, errMsg string) ([]byte, error) {
+	if len(data) != wantLen {
+		return nil, errors.New(errMsg)
+	}
+	return marshalAttribute(t, data)
+}
+
+func marshalFixedLenAttributeWithReserved(t AttributeType, data []byte, wantLen, reservedLen int, errMsg string) ([]byte, error) {
+	if len(data) != wantLen {
+		return nil, errors.New(errMsg)
+	}
+	buf := make([]byte, reservedLen+wantLen)
+	copy(buf[reservedLen:], data)
+	return marshalAttribute(t, buf)
+}
+
+func unmarshalFixedLenAttribute(data []byte, wantLen int, errMsg string) ([]byte, error) {
+	if len(data) < wantLen {
+		return nil, errors.New(errMsg)
+	}
+	out := make([]byte, wantLen)
+	copy(out, data[:wantLen])
+	return out, nil
+}
+
+func unmarshalFixedLenAttributeWithReserved(data []byte, reservedLen, wantLen int, errMsg string) ([]byte, error) {
+	if len(data) < reservedLen+wantLen {
+		return nil, errors.New(errMsg)
+	}
+	out := make([]byte, wantLen)
+	copy(out, data[reservedLen:reservedLen+wantLen])
+	return out, nil
+}
+
+func marshalUint16Attribute(t AttributeType, val uint16) ([]byte, error) {
+	buf := make([]byte, 2)
+	binary.BigEndian.PutUint16(buf, val)
+	return marshalAttribute(t, buf)
+}
+
+func unmarshalUint16Attribute(data []byte, errMsg string) (uint16, error) {
+	if len(data) < 2 {
+		return 0, errors.New(errMsg)
+	}
+	return binary.BigEndian.Uint16(data[:2]), nil
+}
+
+func marshalLenPrefixedStringAttribute(t AttributeType, s string) ([]byte, error) {
+	raw := []byte(s)
+	buf := make([]byte, 2+len(raw))
+	binary.BigEndian.PutUint16(buf[0:2], uint16(len(raw)))
+	copy(buf[2:], raw)
+	return marshalAttribute(t, buf)
+}
+
+func unmarshalLenPrefixedStringAttribute(data []byte, errLenMsg, errDataMsg string) (string, error) {
+	if len(data) < 2 {
+		return "", errors.New(errLenMsg)
+	}
+	actualLen := binary.BigEndian.Uint16(data[0:2])
+	if len(data) < 2+int(actualLen) {
+		return "", errors.New(errDataMsg)
+	}
+	return string(data[2 : 2+actualLen]), nil
+}
+
 // AT_RAND (RFC 4187 Section 10.6)
 type AtRand struct {
 	Rand []byte // 16 bytes
@@ -48,17 +114,14 @@ type AtRand struct {
 
 func (a *AtRand) Type() AttributeType { return AT_RAND }
 func (a *AtRand) Marshal() ([]byte, error) {
-	if len(a.Rand) != 16 {
-		return nil, errors.New("AT_RAND must be 16 bytes")
-	}
-	return marshalAttribute(AT_RAND, a.Rand)
+	return marshalFixedLenAttribute(AT_RAND, a.Rand, 16, "AT_RAND must be 16 bytes")
 }
 func (a *AtRand) Unmarshal(data []byte) error {
-	if len(data) < 16 {
-		return errors.New("invalid AT_RAND length")
+	rand, err := unmarshalFixedLenAttribute(data, 16, "invalid AT_RAND length")
+	if err != nil {
+		return err
 	}
-	a.Rand = make([]byte, 16)
-	copy(a.Rand, data[:16])
+	a.Rand = rand
 	return nil
 }
 
@@ -69,17 +132,14 @@ type AtAutn struct {
 
 func (a *AtAutn) Type() AttributeType { return AT_AUTN }
 func (a *AtAutn) Marshal() ([]byte, error) {
-	if len(a.Autn) != 16 {
-		return nil, errors.New("AT_AUTN must be 16 bytes")
-	}
-	return marshalAttribute(AT_AUTN, a.Autn)
+	return marshalFixedLenAttribute(AT_AUTN, a.Autn, 16, "AT_AUTN must be 16 bytes")
 }
 func (a *AtAutn) Unmarshal(data []byte) error {
-	if len(data) < 16 {
-		return errors.New("invalid AT_AUTN length")
+	autn, err := unmarshalFixedLenAttribute(data, 16, "invalid AT_AUTN length")
+	if err != nil {
+		return err
 	}
-	a.Autn = make([]byte, 16)
-	copy(a.Autn, data[:16])
+	a.Autn = autn
 	return nil
 }
 
@@ -118,17 +178,14 @@ type AtAuts struct {
 
 func (a *AtAuts) Type() AttributeType { return AT_AUTS }
 func (a *AtAuts) Marshal() ([]byte, error) {
-	if len(a.Auts) != 14 {
-		return nil, errors.New("AT_AUTS must be 14 bytes")
-	}
-	return marshalAttribute(AT_AUTS, a.Auts)
+	return marshalFixedLenAttribute(AT_AUTS, a.Auts, 14, "AT_AUTS must be 14 bytes")
 }
 func (a *AtAuts) Unmarshal(data []byte) error {
-	if len(data) < 14 {
-		return errors.New("invalid AT_AUTS length")
+	auts, err := unmarshalFixedLenAttribute(data, 14, "invalid AT_AUTS length")
+	if err != nil {
+		return err
 	}
-	a.Auts = make([]byte, 14)
-	copy(a.Auts, data[:14])
+	a.Auts = auts
 	return nil
 }
 
@@ -167,21 +224,14 @@ type AtIdentity struct {
 func (a *AtIdentity) Type() AttributeType { return AT_IDENTITY }
 func (a *AtIdentity) Marshal() ([]byte, error) {
 	// RFC 4187: 2 bytes actual length + identity
-	idBytes := []byte(a.Identity)
-	buf := make([]byte, 2+len(idBytes))
-	binary.BigEndian.PutUint16(buf[0:2], uint16(len(idBytes)))
-	copy(buf[2:], idBytes)
-	return marshalAttribute(AT_IDENTITY, buf)
+	return marshalLenPrefixedStringAttribute(AT_IDENTITY, a.Identity)
 }
 func (a *AtIdentity) Unmarshal(data []byte) error {
-	if len(data) < 2 {
-		return errors.New("invalid AT_IDENTITY length")
+	identity, err := unmarshalLenPrefixedStringAttribute(data, "invalid AT_IDENTITY length", "invalid AT_IDENTITY data length")
+	if err != nil {
+		return err
 	}
-	actualLen := binary.BigEndian.Uint16(data[0:2])
-	if len(data) < 2+int(actualLen) {
-		return errors.New("invalid AT_IDENTITY data length")
-	}
-	a.Identity = string(data[2 : 2+actualLen])
+	a.Identity = identity
 	return nil
 }
 
@@ -330,21 +380,14 @@ type AtKdfInput struct {
 func (a *AtKdfInput) Type() AttributeType { return AT_KDF_INPUT }
 func (a *AtKdfInput) Marshal() ([]byte, error) {
 	// RFC 5448: Actual Network Name Length (2 bytes) + Network Name
-	nameBytes := []byte(a.NetworkName)
-	buf := make([]byte, 2+len(nameBytes))
-	binary.BigEndian.PutUint16(buf[0:2], uint16(len(nameBytes)))
-	copy(buf[2:], nameBytes)
-	return marshalAttribute(AT_KDF_INPUT, buf)
+	return marshalLenPrefixedStringAttribute(AT_KDF_INPUT, a.NetworkName)
 }
 func (a *AtKdfInput) Unmarshal(data []byte) error {
-	if len(data) < 2 {
-		return errors.New("invalid AT_KDF_INPUT length")
+	networkName, err := unmarshalLenPrefixedStringAttribute(data, "invalid AT_KDF_INPUT length", "invalid AT_KDF_INPUT data length")
+	if err != nil {
+		return err
 	}
-	actualLen := binary.BigEndian.Uint16(data[0:2])
-	if len(data) < 2+int(actualLen) {
-		return errors.New("invalid AT_KDF_INPUT data length")
-	}
-	a.NetworkName = string(data[2 : 2+actualLen])
+	a.NetworkName = networkName
 	return nil
 }
 
@@ -355,15 +398,14 @@ type AtKdf struct {
 
 func (a *AtKdf) Type() AttributeType { return AT_KDF }
 func (a *AtKdf) Marshal() ([]byte, error) {
-	buf := make([]byte, 2)
-	binary.BigEndian.PutUint16(buf, a.KDF)
-	return marshalAttribute(AT_KDF, buf)
+	return marshalUint16Attribute(AT_KDF, a.KDF)
 }
 func (a *AtKdf) Unmarshal(data []byte) error {
-	if len(data) < 2 {
-		return errors.New("invalid AT_KDF length")
+	val, err := unmarshalUint16Attribute(data, "invalid AT_KDF length")
+	if err != nil {
+		return err
 	}
-	a.KDF = binary.BigEndian.Uint16(data[:2])
+	a.KDF = val
 	return nil
 }
 
@@ -374,20 +416,15 @@ type AtNonceMt struct {
 
 func (a *AtNonceMt) Type() AttributeType { return AT_NONCE_MT }
 func (a *AtNonceMt) Marshal() ([]byte, error) {
-	if len(a.NonceMt) != 16 {
-		return nil, errors.New("AT_NONCE_MT must be 16 bytes")
-	}
 	// RFC 4186: 2 bytes reserved + 16 bytes Nonce_MT
-	buf := make([]byte, 2+16)
-	copy(buf[2:], a.NonceMt)
-	return marshalAttribute(AT_NONCE_MT, buf)
+	return marshalFixedLenAttributeWithReserved(AT_NONCE_MT, a.NonceMt, 16, 2, "AT_NONCE_MT must be 16 bytes")
 }
 func (a *AtNonceMt) Unmarshal(data []byte) error {
-	if len(data) < 18 {
-		return errors.New("invalid AT_NONCE_MT length")
+	nonce, err := unmarshalFixedLenAttributeWithReserved(data, 2, 16, "invalid AT_NONCE_MT length")
+	if err != nil {
+		return err
 	}
-	a.NonceMt = make([]byte, 16)
-	copy(a.NonceMt, data[2:18])
+	a.NonceMt = nonce
 	return nil
 }
 
@@ -462,15 +499,14 @@ type AtSelectedVersion struct {
 
 func (a *AtSelectedVersion) Type() AttributeType { return AT_SELECTED_VERSION }
 func (a *AtSelectedVersion) Marshal() ([]byte, error) {
-	buf := make([]byte, 2)
-	binary.BigEndian.PutUint16(buf, a.Version)
-	return marshalAttribute(AT_SELECTED_VERSION, buf)
+	return marshalUint16Attribute(AT_SELECTED_VERSION, a.Version)
 }
 func (a *AtSelectedVersion) Unmarshal(data []byte) error {
-	if len(data) < 2 {
-		return errors.New("invalid AT_SELECTED_VERSION length")
+	val, err := unmarshalUint16Attribute(data, "invalid AT_SELECTED_VERSION length")
+	if err != nil {
+		return err
 	}
-	a.Version = binary.BigEndian.Uint16(data[:2])
+	a.Version = val
 	return nil
 }
 
@@ -481,15 +517,14 @@ type AtCounter struct {
 
 func (a *AtCounter) Type() AttributeType { return AT_COUNTER }
 func (a *AtCounter) Marshal() ([]byte, error) {
-	buf := make([]byte, 2)
-	binary.BigEndian.PutUint16(buf, a.Counter)
-	return marshalAttribute(AT_COUNTER, buf)
+	return marshalUint16Attribute(AT_COUNTER, a.Counter)
 }
 func (a *AtCounter) Unmarshal(data []byte) error {
-	if len(data) < 2 {
-		return errors.New("invalid AT_COUNTER length")
+	val, err := unmarshalUint16Attribute(data, "invalid AT_COUNTER length")
+	if err != nil {
+		return err
 	}
-	a.Counter = binary.BigEndian.Uint16(data[:2])
+	a.Counter = val
 	return nil
 }
 
@@ -516,20 +551,15 @@ type AtNonceS struct {
 
 func (a *AtNonceS) Type() AttributeType { return AT_NONCE_S }
 func (a *AtNonceS) Marshal() ([]byte, error) {
-	if len(a.NonceS) != 16 {
-		return nil, errors.New("AT_NONCE_S must be 16 bytes")
-	}
 	// RFC 4187: 2 bytes reserved + 16 bytes Nonce_S
-	buf := make([]byte, 2+16)
-	copy(buf[2:], a.NonceS)
-	return marshalAttribute(AT_NONCE_S, buf)
+	return marshalFixedLenAttributeWithReserved(AT_NONCE_S, a.NonceS, 16, 2, "AT_NONCE_S must be 16 bytes")
 }
 func (a *AtNonceS) Unmarshal(data []byte) error {
-	if len(data) < 18 {
-		return errors.New("invalid AT_NONCE_S length")
+	nonce, err := unmarshalFixedLenAttributeWithReserved(data, 2, 16, "invalid AT_NONCE_S length")
+	if err != nil {
+		return err
 	}
-	a.NonceS = make([]byte, 16)
-	copy(a.NonceS, data[2:18])
+	a.NonceS = nonce
 	return nil
 }
 
@@ -540,15 +570,14 @@ type AtClientErrorCode struct {
 
 func (a *AtClientErrorCode) Type() AttributeType { return AT_CLIENT_ERROR_CODE }
 func (a *AtClientErrorCode) Marshal() ([]byte, error) {
-	buf := make([]byte, 2)
-	binary.BigEndian.PutUint16(buf, a.Code)
-	return marshalAttribute(AT_CLIENT_ERROR_CODE, buf)
+	return marshalUint16Attribute(AT_CLIENT_ERROR_CODE, a.Code)
 }
 func (a *AtClientErrorCode) Unmarshal(data []byte) error {
-	if len(data) < 2 {
-		return errors.New("invalid AT_CLIENT_ERROR_CODE length")
+	val, err := unmarshalUint16Attribute(data, "invalid AT_CLIENT_ERROR_CODE length")
+	if err != nil {
+		return err
 	}
-	a.Code = binary.BigEndian.Uint16(data[:2])
+	a.Code = val
 	return nil
 }
 
@@ -559,20 +588,15 @@ type AtIv struct {
 
 func (a *AtIv) Type() AttributeType { return AT_IV }
 func (a *AtIv) Marshal() ([]byte, error) {
-	if len(a.IV) != 16 {
-		return nil, errors.New("AT_IV must be 16 bytes")
-	}
 	// RFC 4187: 2 bytes reserved + 16 bytes IV
-	buf := make([]byte, 2+16)
-	copy(buf[2:], a.IV)
-	return marshalAttribute(AT_IV, buf)
+	return marshalFixedLenAttributeWithReserved(AT_IV, a.IV, 16, 2, "AT_IV must be 16 bytes")
 }
 func (a *AtIv) Unmarshal(data []byte) error {
-	if len(data) < 18 {
-		return errors.New("invalid AT_IV length")
+	iv, err := unmarshalFixedLenAttributeWithReserved(data, 2, 16, "invalid AT_IV length")
+	if err != nil {
+		return err
 	}
-	a.IV = make([]byte, 16)
-	copy(a.IV, data[2:18])
+	a.IV = iv
 	return nil
 }
 
@@ -606,21 +630,14 @@ func (a *AtNextPseudonym) Type() AttributeType { return AT_NEXT_PSEUDONYM }
 func (a *AtNextPseudonym) Marshal() ([]byte, error) {
 	// RFC 4187: 2 bytes actual length + pseudonym
 	// Encrypted inside AT_ENCR_DATA usually, but this struct just handles the attribute itself.
-	idBytes := []byte(a.Pseudonym)
-	buf := make([]byte, 2+len(idBytes))
-	binary.BigEndian.PutUint16(buf[0:2], uint16(len(idBytes)))
-	copy(buf[2:], idBytes)
-	return marshalAttribute(AT_NEXT_PSEUDONYM, buf)
+	return marshalLenPrefixedStringAttribute(AT_NEXT_PSEUDONYM, a.Pseudonym)
 }
 func (a *AtNextPseudonym) Unmarshal(data []byte) error {
-	if len(data) < 2 {
-		return errors.New("invalid AT_NEXT_PSEUDONYM length")
+	pseudonym, err := unmarshalLenPrefixedStringAttribute(data, "invalid AT_NEXT_PSEUDONYM length", "invalid AT_NEXT_PSEUDONYM data length")
+	if err != nil {
+		return err
 	}
-	actualLen := binary.BigEndian.Uint16(data[0:2])
-	if len(data) < 2+int(actualLen) {
-		return errors.New("invalid AT_NEXT_PSEUDONYM data length")
-	}
-	a.Pseudonym = string(data[2 : 2+actualLen])
+	a.Pseudonym = pseudonym
 	return nil
 }
 
@@ -632,21 +649,14 @@ type AtNextReauthId struct {
 func (a *AtNextReauthId) Type() AttributeType { return AT_NEXT_REAUTH_ID }
 func (a *AtNextReauthId) Marshal() ([]byte, error) {
 	// RFC 4187: 2 bytes actual length + identity
-	idBytes := []byte(a.Identity)
-	buf := make([]byte, 2+len(idBytes))
-	binary.BigEndian.PutUint16(buf[0:2], uint16(len(idBytes)))
-	copy(buf[2:], idBytes)
-	return marshalAttribute(AT_NEXT_REAUTH_ID, buf)
+	return marshalLenPrefixedStringAttribute(AT_NEXT_REAUTH_ID, a.Identity)
 }
 func (a *AtNextReauthId) Unmarshal(data []byte) error {
-	if len(data) < 2 {
-		return errors.New("invalid AT_NEXT_REAUTH_ID length")
+	identity, err := unmarshalLenPrefixedStringAttribute(data, "invalid AT_NEXT_REAUTH_ID length", "invalid AT_NEXT_REAUTH_ID data length")
+	if err != nil {
+		return err
 	}
-	actualLen := binary.BigEndian.Uint16(data[0:2])
-	if len(data) < 2+int(actualLen) {
-		return errors.New("invalid AT_NEXT_REAUTH_ID data length")
-	}
-	a.Identity = string(data[2 : 2+actualLen])
+	a.Identity = identity
 	return nil
 }
 
