@@ -68,6 +68,9 @@ func Parse(data []byte) (*Packet, error) {
 		if offset+attrLen > len(attrData) {
 			return nil, fmt.Errorf("attribute %d length overflow", attrType)
 		}
+		if p.Type == TypeAKAPrime && attrType == AT_BIDDING {
+			return nil, errors.New("AT_BIDDING is only valid for EAP-AKA")
+		}
 
 		// Value is after Type(1) + Length(1) = 2 bytes
 		valData := attrData[offset+2 : offset+attrLen]

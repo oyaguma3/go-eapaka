@@ -24,6 +24,9 @@ func (p *Packet) Marshal() ([]byte, error) {
 		attrsBuf.Write([]byte{0x00, 0x00}) // Reserved
 
 		for _, attr := range p.Attributes {
+			if p.Type == TypeAKAPrime && attr.Type() == AT_BIDDING {
+				return nil, errors.New("AT_BIDDING is only valid for EAP-AKA")
+			}
 			b, err := attr.Marshal()
 			if err != nil {
 				return nil, err

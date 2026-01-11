@@ -47,13 +47,19 @@ const (
 	AT_COUNTER_TOO_SMALL AttributeType = 20  // RFC 4187 Section 10.17
 	AT_NONCE_S           AttributeType = 21  // RFC 4187 Section 10.18
 	AT_CLIENT_ERROR_CODE AttributeType = 22  // RFC 4187 Section 10.20
-	AT_KDF_INPUT         AttributeType = 23  // RFC 5448 Section 6.2 (assigned) / Section 3.1 (format)
-	AT_KDF               AttributeType = 24  // RFC 5448 Section 6.2 (assigned) / Section 3.2 (format)
+	AT_KDF_INPUT         AttributeType = 23  // RFC 9048 Section 3.1 (format)
+	AT_KDF               AttributeType = 24  // RFC 9048 Section 3.2 (format)
 	AT_IV                AttributeType = 129 // RFC 4187 Section 10.12
 	AT_ENCR_DATA         AttributeType = 130 // RFC 4187 Section 10.12
 	AT_NEXT_PSEUDONYM    AttributeType = 132 // RFC 4187 Section 10.10
 	AT_NEXT_REAUTH_ID    AttributeType = 133 // RFC 4187 Section 10.11
 	AT_CHECKCODE         AttributeType = 134 // RFC 4187 Section 10.13
 	AT_RESULT_IND        AttributeType = 135 // RFC 4187 Section 10.14
-	AT_BIDDING           AttributeType = 136 // RFC 5448 Section 6.2 (assigned) / Section 4 (format)
+	AT_BIDDING           AttributeType = 136 // RFC 9048 Section 4 (format)
+)
+
+// AT_KDF values (RFC 9048 Section 8.3).
+const (
+	KDFReserved         uint16 = 0
+	KDFAKAPrimeWithCKIK uint16 = 1
 )

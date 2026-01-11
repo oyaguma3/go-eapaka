@@ -301,10 +301,11 @@ func (a *AtResultInd) Unmarshal(data []byte) error {
 	return nil
 }
 
-// AT_BIDDING (RFC 5448 Section 4)
+// AT_BIDDING (RFC 9048 Section 4)
 const (
-	// AtBiddingFlagAKAPrime indicates support for EAP-AKA'.
-	AtBiddingFlagAKAPrime uint16 = 1 << 0
+	// AtBiddingFlagAKAPrime indicates support for EAP-AKA' and preference for it.
+	// This is the D bit (MSB) from RFC 9048 Section 4.
+	AtBiddingFlagAKAPrime uint16 = 0x8000
 )
 
 type AtBidding struct {
@@ -314,14 +315,14 @@ type AtBidding struct {
 func (a *AtBidding) Type() AttributeType { return AT_BIDDING }
 func (a *AtBidding) Marshal() ([]byte, error) {
 	buf := make([]byte, 2)
-	binary.BigEndian.PutUint16(buf, a.Flags)
+	binary.BigEndian.PutUint16(buf, a.Flags&AtBiddingFlagAKAPrime)
 	return marshalAttribute(AT_BIDDING, buf)
 }
 func (a *AtBidding) Unmarshal(data []byte) error {
 	if len(data) < 2 {
 		return errors.New("invalid AT_BIDDING length")
 	}
-	a.Flags = binary.BigEndian.Uint16(data[:2])
+	a.Flags = binary.BigEndian.Uint16(data[:2]) & AtBiddingFlagAKAPrime
 	return nil
 }
 
@@ -372,7 +373,7 @@ func (a *AtPadding) Unmarshal(data []byte) error {
 	return nil
 }
 
-// AT_KDF_INPUT (RFC 5448 Section 3.1)
+// AT_KDF_INPUT (RFC 9048 Section 3.1)
 type AtKdfInput struct {
 	NetworkName string
 }
@@ -380,6 +381,9 @@ type AtKdfInput struct {
 func (a *AtKdfInput) Type() AttributeType { return AT_KDF_INPUT }
 func (a *AtKdfInput) Marshal() ([]byte, error) {
 	// RFC 5448: Actual Network Name Length (2 bytes) + Network Name
+	if a.NetworkName == "" {
+		return nil, errors.New("AT_KDF_INPUT must be non-empty")
+	}
 	return marshalLenPrefixedStringAttribute(AT_KDF_INPUT, a.NetworkName)
 }
 func (a *AtKdfInput) Unmarshal(data []byte) error {
@@ -387,11 +391,14 @@ func (a *AtKdfInput) Unmarshal(data []byte) error {
 	if err != nil {
 		return err
 	}
+	if networkName == "" {
+		return errors.New("AT_KDF_INPUT must be non-empty")
+	}
 	a.NetworkName = networkName
 	return nil
 }
 
-// AT_KDF (RFC 5448 Section 3.2)
+// AT_KDF (RFC 9048 Section 3.2)
 type AtKdf struct {
 	KDF uint16
 }

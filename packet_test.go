@@ -135,6 +135,38 @@ func TestPacket_Marshal_UnsupportedType(t *testing.T) {
 	}
 }
 
+func TestPacket_Marshal_ATBiddingWithAKAPrime(t *testing.T) {
+	pkt := &eapaka.Packet{
+		Code:       eapaka.CodeRequest,
+		Identifier: 1,
+		Type:       eapaka.TypeAKAPrime,
+		Subtype:    eapaka.SubtypeChallenge,
+		Attributes: []eapaka.Attribute{
+			&eapaka.AtBidding{Flags: eapaka.AtBiddingFlagAKAPrime},
+		},
+	}
+
+	if _, err := pkt.Marshal(); err == nil {
+		t.Fatal("expected error for AT_BIDDING in AKA'")
+	}
+}
+
+func TestParse_ATBiddingWithAKAPrime(t *testing.T) {
+	bidding, err := (&eapaka.AtBidding{Flags: eapaka.AtBiddingFlagAKAPrime}).Marshal()
+	if err != nil {
+		t.Fatalf("failed to marshal AT_BIDDING: %v", err)
+	}
+
+	payload := append([]byte{eapaka.TypeAKAPrime, eapaka.SubtypeChallenge, 0x00, 0x00}, bidding...)
+	data := make([]byte, 0, 4+len(payload))
+	data = append(data, eapaka.CodeRequest, 1, 0x00, byte(4+len(payload)))
+	data = append(data, payload...)
+
+	if _, err := eapaka.Parse(data); err == nil {
+		t.Fatal("expected error for AT_BIDDING in AKA' packet")
+	}
+}
+
 func TestAtBiddingFlags(t *testing.T) {
 	attr := &eapaka.AtBidding{}
 	if attr.SupportsAKAPrime() {
