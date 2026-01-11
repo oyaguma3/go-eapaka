@@ -81,6 +81,23 @@ func main() {
 }
 ```
 
+### AT_BIDDING (AKA/AKA' Negotiation)
+
+```go
+bid := &eapaka.AtBidding{}
+bid.SetAKAPrime(true) // Advertise AKA' support
+
+pkt := &eapaka.Packet{
+	Code:       eapaka.CodeRequest,
+	Identifier: 1,
+	Type:       eapaka.TypeAKA,
+	Subtype:    eapaka.SubtypeIdentity,
+	Attributes: []eapaka.Attribute{
+		bid,
+	},
+}
+```
+
 ### Key Derivation (KDF)
 
 Derive session keys for EAP-AKA (RFC 4187) and EAP-AKA' (RFC 5448).
@@ -129,7 +146,7 @@ encRecvKey, _ := eapaka.EncryptMPPEKey(recvKey, secret, reqAuth)
 - **Notification & Error**: `AT_NOTIFICATION`, `AT_CLIENT_ERROR_CODE`
 - **Re-authentication**: `AT_COUNTER`, `AT_COUNTER_TOO_SMALL`, `AT_NONCE_S`, `AT_NEXT_PSEUDONYM`, `AT_NEXT_REAUTH_ID`
 - **Encryption**: `AT_IV`, `AT_ENCR_DATA`, `AT_PADDING`
-- **EAP-AKA' Extensions**: `AT_KDF`, `AT_KDF_INPUT`, `AT_BIDDING`
+- **EAP-AKA' Extensions**: `AT_KDF`, `AT_KDF_INPUT`, `AT_BIDDING` (flags: `AtBiddingFlagAKAPrime`)
 - **Others**: `AT_CHECKCODE`, `AT_RESULT_IND`, `AT_NONCE_MT`, `AT_VERSION_LIST`, `AT_SELECTED_VERSION`
 
 ## References

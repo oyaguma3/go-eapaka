@@ -17,19 +17,25 @@ func Parse(data []byte) (*Packet, error) {
 	p.Identifier = data[1]
 	length := binary.BigEndian.Uint16(data[2:4])
 
+	if length < 4 {
+		return nil, errors.New("packet length too small")
+	}
 	if int(length) > len(data) {
 		return nil, errors.New("packet length mismatch")
 	}
 	// Use only the slice indicated by length
 	payload := data[4:length]
 
-	// If Success or Failure, no more data expected (usually)
+	// If Success or Failure, no more data expected
 	if p.Code == CodeSuccess || p.Code == CodeFailure {
+		if len(payload) != 0 {
+			return nil, errors.New("unexpected data in success/failure packet")
+		}
 		return p, nil
 	}
 
 	if len(payload) == 0 {
-		return p, nil // Empty Request/Response?
+		return nil, errors.New("missing EAP type")
 	}
 
 	p.Type = payload[0]

@@ -90,7 +90,7 @@ RFC 4187 および RFC 5448 で定義される以下の属性を実装してい�
 - **通知・エラー:** `AT_NOTIFICATION`, `AT_CLIENT_ERROR_CODE`
 - **再認証・仮名:** `AT_NEXT_PSEUDONYM`, `AT_NEXT_REAUTH_ID`, `AT_COUNTER`, `AT_COUNTER_TOO_SMALL`, `AT_NONCE_S`
 - **暗号化:** `AT_IV`, `AT_ENCR_DATA`, `AT_PADDING`
-- **EAP-AKA' 拡張:** `AT_KDF`, `AT_KDF_INPUT`, `AT_BIDDING`
+- **EAP-AKA' 拡張:** `AT_KDF`, `AT_KDF_INPUT`, `AT_BIDDING` (flags: `AtBiddingFlagAKAPrime`)
 - **その他:** `AT_CHECKCODE`, `AT_RESULT_IND`, `AT_NONCE_MT`, `AT_VERSION_LIST`, `AT_SELECTED_VERSION`
 
 ## 4. 処理ロジック詳細 (Logic Details)

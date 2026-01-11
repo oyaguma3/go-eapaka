@@ -58,6 +58,7 @@ func TestPacket_Attributes(t *testing.T) {
 			&eapaka.AtNotification{S: true, P: false, Code: 1026},
 			&eapaka.AtCounter{Counter: 12345},
 			&eapaka.AtClientErrorCode{Code: 1},
+			&eapaka.AtBidding{Flags: eapaka.AtBiddingFlagAKAPrime},
 		},
 	}
 
@@ -91,6 +92,62 @@ func TestPacket_Success(t *testing.T) {
 	}
 	if diff := cmp.Diff(original, parsed); diff != "" {
 		t.Errorf("Packet mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestParse_InvalidLengthTooSmall(t *testing.T) {
+	// Length field is less than 4 (EAP header size)
+	data := []byte{eapaka.CodeRequest, 1, 0x00, 0x03}
+
+	if _, err := eapaka.Parse(data); err == nil {
+		t.Fatal("expected error for invalid length < 4")
+	}
+}
+
+func TestParse_SuccessWithPayload(t *testing.T) {
+	// Success packet must not include payload
+	data := []byte{eapaka.CodeSuccess, 1, 0x00, 0x05, 0x00}
+
+	if _, err := eapaka.Parse(data); err == nil {
+		t.Fatal("expected error for success packet with payload")
+	}
+}
+
+func TestParse_RequestMissingType(t *testing.T) {
+	// Request packet must include a Type
+	data := []byte{eapaka.CodeRequest, 1, 0x00, 0x04}
+
+	if _, err := eapaka.Parse(data); err == nil {
+		t.Fatal("expected error for request packet without type")
+	}
+}
+
+func TestPacket_Marshal_UnsupportedType(t *testing.T) {
+	pkt := &eapaka.Packet{
+		Code:       eapaka.CodeRequest,
+		Identifier: 1,
+		Type:       0,
+	}
+
+	if _, err := pkt.Marshal(); err == nil {
+		t.Fatal("expected error for unsupported type in request/response")
+	}
+}
+
+func TestAtBiddingFlags(t *testing.T) {
+	attr := &eapaka.AtBidding{}
+	if attr.SupportsAKAPrime() {
+		t.Fatal("expected AKA' support to be disabled by default")
+	}
+
+	attr.SetAKAPrime(true)
+	if !attr.SupportsAKAPrime() {
+		t.Fatal("expected AKA' support to be enabled")
+	}
+
+	attr.SetAKAPrime(false)
+	if attr.SupportsAKAPrime() {
+		t.Fatal("expected AKA' support to be disabled")
 	}
 }
 

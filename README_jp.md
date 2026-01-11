@@ -83,6 +83,23 @@ func main() {
 }
 ```
 
+### AT_BIDDING (AKA/AKA' ネゴシエーション)
+
+```go
+bid := &eapaka.AtBidding{}
+bid.SetAKAPrime(true) // AKA' 対応を通知
+
+pkt := &eapaka.Packet{
+	Code:       eapaka.CodeRequest,
+	Identifier: 1,
+	Type:       eapaka.TypeAKA,
+	Subtype:    eapaka.SubtypeIdentity,
+	Attributes: []eapaka.Attribute{
+		bid,
+	},
+}
+```
+
 ### 鍵導出 (KDF)
 
 EAP-AKA (RFC 4187) および EAP-AKA' (RFC 5448) 用のセッション鍵を導出します。
@@ -131,7 +148,7 @@ encRecvKey, _ := eapaka.EncryptMPPEKey(recvKey, secret, reqAuth)
 - **通知・エラー**: `AT_NOTIFICATION`, `AT_CLIENT_ERROR_CODE`
 - **再認証・仮名**: `AT_COUNTER`, `AT_COUNTER_TOO_SMALL`, `AT_NONCE_S`, `AT_NEXT_PSEUDONYM`, `AT_NEXT_REAUTH_ID`
 - **暗号化**: `AT_IV`, `AT_ENCR_DATA`, `AT_PADDING`
-- **EAP-AKA' 拡張**: `AT_KDF`, `AT_KDF_INPUT`, `AT_BIDDING`
+- **EAP-AKA' 拡張**: `AT_KDF`, `AT_KDF_INPUT`, `AT_BIDDING` (flags: `AtBiddingFlagAKAPrime`)
 - **その他**: `AT_CHECKCODE`, `AT_RESULT_IND`, `AT_NONCE_MT`, `AT_VERSION_LIST`, `AT_SELECTED_VERSION`
 
 ## 参考文献

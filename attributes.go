@@ -252,19 +252,39 @@ func (a *AtResultInd) Unmarshal(data []byte) error {
 }
 
 // AT_BIDDING (RFC 5448 Section 4)
+const (
+	// AtBiddingFlagAKAPrime indicates support for EAP-AKA'.
+	AtBiddingFlagAKAPrime uint16 = 1 << 0
+)
+
 type AtBidding struct {
-	// Contains two reserved bytes
+	Flags uint16
 }
 
 func (a *AtBidding) Type() AttributeType { return AT_BIDDING }
 func (a *AtBidding) Marshal() ([]byte, error) {
-	return marshalAttribute(AT_BIDDING, make([]byte, 2))
+	buf := make([]byte, 2)
+	binary.BigEndian.PutUint16(buf, a.Flags)
+	return marshalAttribute(AT_BIDDING, buf)
 }
 func (a *AtBidding) Unmarshal(data []byte) error {
 	if len(data) < 2 {
 		return errors.New("invalid AT_BIDDING length")
 	}
+	a.Flags = binary.BigEndian.Uint16(data[:2])
 	return nil
+}
+
+func (a *AtBidding) SupportsAKAPrime() bool {
+	return (a.Flags & AtBiddingFlagAKAPrime) != 0
+}
+
+func (a *AtBidding) SetAKAPrime(enabled bool) {
+	if enabled {
+		a.Flags |= AtBiddingFlagAKAPrime
+		return
+	}
+	a.Flags &^= AtBiddingFlagAKAPrime
 }
 
 // AT_CHECKCODE (RFC 4187 Section 10.13)

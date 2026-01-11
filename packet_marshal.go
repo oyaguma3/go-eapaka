@@ -13,14 +13,15 @@ func (p *Packet) Marshal() ([]byte, error) {
 	// 1. Marshal Attributes first to calculate length
 	var attrsBuf bytes.Buffer
 	if p.Code == CodeRequest || p.Code == CodeResponse {
+		if p.Type != TypeAKA && p.Type != TypeAKAPrime {
+			return nil, errors.New("unsupported EAP type for request/response")
+		}
+
 		// EAP-AKA/AKA' header inside EAP Data
 		// Type (1) + Subtype (1) + Reserved (2) = 4 bytes
-		// Only if Type is AKA or AKA'
-		if p.Type == TypeAKA || p.Type == TypeAKAPrime {
-			attrsBuf.WriteByte(p.Type)
-			attrsBuf.WriteByte(p.Subtype)
-			attrsBuf.Write([]byte{0x00, 0x00}) // Reserved
-		}
+		attrsBuf.WriteByte(p.Type)
+		attrsBuf.WriteByte(p.Subtype)
+		attrsBuf.Write([]byte{0x00, 0x00}) // Reserved
 
 		for _, attr := range p.Attributes {
 			b, err := attr.Marshal()
