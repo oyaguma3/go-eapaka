@@ -112,7 +112,20 @@ RFC 3748 および RFC 4187 に従い、以下の順序で検証を行います�
 - **Length Calculation:** パケット全体の Length、各属性の Length（4バイトワード単位）を自動計算。
 - **Padding:** EAP-AKAの仕様に従い、各属性が **4バイト境界（32-bit boundary）** に整合するよう、末尾に `0x00` パディングを自動付与。
 
-### 4.3 MAC計算 (Crypto)
+### 4.3 属性単位のRFC準拠ルール (Attribute-Level Compliance Rules)
+
+相互接続性の観点で重要な属性については、以下の制約を実装で強制します。
+
+- **AT_RAND / AT_AUTN (RFC 4187):**
+  - Value形式は `Reserved(2) + RAND/AUTN(16)` を厳守する。
+  - Marshal/Unmarshal ともに Reserved領域を先頭として扱う。
+- **AT_PADDING (RFC 4187 Section 10.12):**
+  - Value長は `2` / `6` / `10` バイトのみ許容（属性全体長では `4` / `8` / `12`）。
+  - Unmarshal時は全バイト `0x00` を検証する。
+- **AT_CHECKCODE (RFC 4187 / RFC 5448):**
+  - Checkcode長は `0` / `20` (AKA) / `32` (AKA') のみ許容する。
+
+### 4.4 MAC計算 (Crypto)
 
 `Packet` 構造体のメソッドとして実装します。
 
@@ -147,6 +160,19 @@ func TestPacket_RoundTrip(t *testing.T) {
     }
 }
 ```
+
+### 5.2 RFC準拠レイアウト/制約テスト
+
+Round-Tripだけでは検出しにくい仕様逸脱を防ぐため、属性ごとの専用テストを追加します。
+
+- `AT_RAND` / `AT_AUTN`:
+  - RFC形式（`Reserved(2) + 16byte`）のバイト列を直接検証する。
+  - Parse時に RFC準拠データを正しく解釈できることを確認する。
+- `AT_PADDING`:
+  - 許可長（2/6/10）と不許可長を検証する。
+  - 非ゼロバイトを拒否することを検証する。
+- `AT_CHECKCODE`:
+  - 許可長（0/20/32）と不許可長を検証する。
 
 ## 6. ドキュメント方針 (Documentation & Examples)
 

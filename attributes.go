@@ -114,10 +114,11 @@ type AtRand struct {
 
 func (a *AtRand) Type() AttributeType { return AT_RAND }
 func (a *AtRand) Marshal() ([]byte, error) {
-	return marshalFixedLenAttribute(AT_RAND, a.Rand, 16, "AT_RAND must be 16 bytes")
+	// RFC 4187: 2 bytes reserved + 16 bytes RAND
+	return marshalFixedLenAttributeWithReserved(AT_RAND, a.Rand, 16, 2, "AT_RAND must be 16 bytes")
 }
 func (a *AtRand) Unmarshal(data []byte) error {
-	rand, err := unmarshalFixedLenAttribute(data, 16, "invalid AT_RAND length")
+	rand, err := unmarshalFixedLenAttributeWithReserved(data, 2, 16, "invalid AT_RAND length")
 	if err != nil {
 		return err
 	}
@@ -132,10 +133,11 @@ type AtAutn struct {
 
 func (a *AtAutn) Type() AttributeType { return AT_AUTN }
 func (a *AtAutn) Marshal() ([]byte, error) {
-	return marshalFixedLenAttribute(AT_AUTN, a.Autn, 16, "AT_AUTN must be 16 bytes")
+	// RFC 4187: 2 bytes reserved + 16 bytes AUTN
+	return marshalFixedLenAttributeWithReserved(AT_AUTN, a.Autn, 16, 2, "AT_AUTN must be 16 bytes")
 }
 func (a *AtAutn) Unmarshal(data []byte) error {
-	autn, err := unmarshalFixedLenAttribute(data, 16, "invalid AT_AUTN length")
+	autn, err := unmarshalFixedLenAttributeWithReserved(data, 2, 16, "invalid AT_AUTN length")
 	if err != nil {
 		return err
 	}
@@ -150,7 +152,7 @@ type AtRes struct {
 
 func (a *AtRes) Type() AttributeType { return AT_RES }
 func (a *AtRes) Marshal() ([]byte, error) {
-	// RFC 4187: 2 bytes reserved + 2 bytes res length (bits) + res value
+	// RFC 4187: 2 bytes RES length (bits) + RES value
 	resLenBits := len(a.Res) * 8
 	buf := make([]byte, 2+len(a.Res))
 	binary.BigEndian.PutUint16(buf[0:2], uint16(resLenBits))
@@ -343,8 +345,15 @@ type AtCheckcode struct {
 	Checkcode []byte
 }
 
+func isValidAtCheckcodeLen(l int) bool {
+	return l == 0 || l == 20 || l == 32
+}
+
 func (a *AtCheckcode) Type() AttributeType { return AT_CHECKCODE }
 func (a *AtCheckcode) Marshal() ([]byte, error) {
+	if !isValidAtCheckcodeLen(len(a.Checkcode)) {
+		return nil, errors.New("AT_CHECKCODE must be 0, 20 (AKA), or 32 (AKA') bytes")
+	}
 	// RFC 5448: 2 bytes reserved + checkcode
 	buf := make([]byte, 2+len(a.Checkcode))
 	copy(buf[2:], a.Checkcode)
@@ -354,7 +363,11 @@ func (a *AtCheckcode) Unmarshal(data []byte) error {
 	if len(data) < 2 {
 		return errors.New("invalid AT_CHECKCODE length")
 	}
-	a.Checkcode = make([]byte, len(data)-2)
+	checkcodeLen := len(data) - 2
+	if !isValidAtCheckcodeLen(checkcodeLen) {
+		return errors.New("invalid AT_CHECKCODE size")
+	}
+	a.Checkcode = make([]byte, checkcodeLen)
 	copy(a.Checkcode, data[2:])
 	return nil
 }
@@ -364,11 +377,26 @@ type AtPadding struct {
 	Length int // Number of zero bytes
 }
 
+func isValidAtPaddingValueLen(l int) bool {
+	return l == 2 || l == 6 || l == 10
+}
+
 func (a *AtPadding) Type() AttributeType { return AT_PADDING }
 func (a *AtPadding) Marshal() ([]byte, error) {
+	if !isValidAtPaddingValueLen(a.Length) {
+		return nil, errors.New("AT_PADDING length must be 2, 6, or 10 bytes")
+	}
 	return marshalAttribute(AT_PADDING, make([]byte, a.Length))
 }
 func (a *AtPadding) Unmarshal(data []byte) error {
+	if !isValidAtPaddingValueLen(len(data)) {
+		return errors.New("invalid AT_PADDING length")
+	}
+	for _, b := range data {
+		if b != 0x00 {
+			return errors.New("AT_PADDING bytes must be zero")
+		}
+	}
 	a.Length = len(data)
 	return nil
 }

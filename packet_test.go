@@ -1,6 +1,7 @@
 package eapaka_test
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 
@@ -44,6 +45,53 @@ func TestPacket_RoundTrip(t *testing.T) {
 	// Actually, cmp handles interfaces well if the underlying types match.
 	if diff := cmp.Diff(original, parsed); diff != "" {
 		t.Errorf("Packet mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestParse_RFCFormattedRandAutn(t *testing.T) {
+	rand := make([]byte, 16)
+	autn := make([]byte, 16)
+	for i := 0; i < 16; i++ {
+		rand[i] = byte(i + 1)
+		autn[i] = byte(0xA0 + i)
+	}
+
+	// AT_RAND: Type(1) + Len(1=5) + Reserved(2) + RAND(16)
+	atRand := append([]byte{byte(eapaka.AT_RAND), 0x05, 0x00, 0x00}, rand...)
+	// AT_AUTN: Type(1) + Len(1=5) + Reserved(2) + AUTN(16)
+	atAutn := append([]byte{byte(eapaka.AT_AUTN), 0x05, 0x00, 0x00}, autn...)
+
+	payload := []byte{eapaka.TypeAKA, eapaka.SubtypeChallenge, 0x00, 0x00}
+	payload = append(payload, atRand...)
+	payload = append(payload, atAutn...)
+
+	length := 4 + len(payload)
+	raw := []byte{eapaka.CodeRequest, 0x22, byte(length >> 8), byte(length)}
+	raw = append(raw, payload...)
+
+	parsed, err := eapaka.Parse(raw)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	if len(parsed.Attributes) != 2 {
+		t.Fatalf("unexpected attribute count: want=2 got=%d", len(parsed.Attributes))
+	}
+
+	parsedRand, ok := parsed.Attributes[0].(*eapaka.AtRand)
+	if !ok {
+		t.Fatalf("unexpected attr[0] type: %T", parsed.Attributes[0])
+	}
+	if !bytes.Equal(parsedRand.Rand, rand) {
+		t.Fatalf("unexpected parsed RAND:\nwant=%x\ngot =%x", rand, parsedRand.Rand)
+	}
+
+	parsedAutn, ok := parsed.Attributes[1].(*eapaka.AtAutn)
+	if !ok {
+		t.Fatalf("unexpected attr[1] type: %T", parsed.Attributes[1])
+	}
+	if !bytes.Equal(parsedAutn.Autn, autn) {
+		t.Fatalf("unexpected parsed AUTN:\nwant=%x\ngot =%x", autn, parsedAutn.Autn)
 	}
 }
 

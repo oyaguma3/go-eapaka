@@ -140,7 +140,7 @@ encRecvKey, _ := eapaka.EncryptMPPEKey(recvKey, secret, reqAuth)
 
 ## Supported Attributes
 
-**Note**: This library handles the attribute headers (Type and Length) and padding. For the attribute value (data), you must construct the byte slice yourself according to the RFC definitions and assign it to the corresponding field (e.g., `Rand`, `Autn`, `Identity`).
+**Note**: This library handles the attribute headers (Type and Length) and padding. For the attribute value (data), you must construct the byte slice yourself according to the RFC definitions and assign it to the corresponding field (e.g., `Rand`, `Autn`, `Identity`). For `AT_RAND` and `AT_AUTN`, pass only 16-byte `Rand`/`Autn`; the `Reserved(2)` bytes are handled internally.
 
 - **Authentication**: `AT_RAND`, `AT_AUTN`, `AT_RES`, `AT_AUTS`, `AT_MAC`
 - **Identity**: `AT_IDENTITY`, `AT_PERMANENT_ID_REQ`, `AT_ANY_ID_REQ`, `AT_FULLAUTH_ID_REQ`
@@ -149,6 +149,21 @@ encRecvKey, _ := eapaka.EncryptMPPEKey(recvKey, secret, reqAuth)
 - **Encryption**: `AT_IV`, `AT_ENCR_DATA`, `AT_PADDING`
 - **EAP-AKA' Extensions**: `AT_KDF`, `AT_KDF_INPUT`, `AT_BIDDING` (flags: `AtBiddingFlagAKAPrime`)
 - **Others**: `AT_CHECKCODE`, `AT_RESULT_IND`, `AT_NONCE_MT`, `AT_VERSION_LIST`, `AT_SELECTED_VERSION`
+
+## RFC Compliance Updates (2026-02-20)
+
+The following behavior was updated to align with RFC 4187 / RFC 5448:
+
+- `AT_RAND` and `AT_AUTN` now encode/decode the Value field as `Reserved(2) + RAND/AUTN(16)` (RFC 4187).
+- `AT_PADDING` now validates strict RFC constraints:
+  - Value length must be `2`, `6`, or `10` bytes (attribute total length `4`, `8`, or `12` bytes).
+  - All bytes must be `0x00` on unmarshal.
+- `AT_CHECKCODE` now validates size as `0`, `20` (EAP-AKA), or `32` (EAP-AKA').
+
+Compatibility note:
+
+- If you relied on previous non-compliant behavior, parsing/marshaling results may change.
+- RFC-compliant peers should now interoperate correctly for `AT_RAND` / `AT_AUTN`.
 
 ## References
 

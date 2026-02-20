@@ -142,7 +142,7 @@ encRecvKey, _ := eapaka.EncryptMPPEKey(recvKey, secret, reqAuth)
 
 ## サポートしている属性
 
-**注意**: 本ライブラリは属性ヘッダー (Type, Length) とパディングの処理のみを行います。属性値（データ部分）については、RFCの定義に従って利用者自身がバイト列を構築し、対応するフィールド（`Rand`, `Autn`, `Identity` 等）に格納する必要があります。
+**注意**: 本ライブラリは属性ヘッダー (Type, Length) とパディングの処理のみを行います。属性値（データ部分）については、RFCの定義に従って利用者自身がバイト列を構築し、対応するフィールド（`Rand`, `Autn`, `Identity` 等）に格納する必要があります。`AT_RAND` と `AT_AUTN` は 16バイトの `Rand`/`Autn` だけを指定してください（`Reserved(2)` はライブラリ内部で処理されます）。
 
 - **認証・鍵生成**: `AT_RAND`, `AT_AUTN`, `AT_RES`, `AT_AUTS`, `AT_MAC`
 - **ID管理**: `AT_IDENTITY`, `AT_PERMANENT_ID_REQ`, `AT_ANY_ID_REQ`, `AT_FULLAUTH_ID_REQ`
@@ -151,6 +151,21 @@ encRecvKey, _ := eapaka.EncryptMPPEKey(recvKey, secret, reqAuth)
 - **暗号化**: `AT_IV`, `AT_ENCR_DATA`, `AT_PADDING`
 - **EAP-AKA' 拡張**: `AT_KDF`, `AT_KDF_INPUT`, `AT_BIDDING` (flags: `AtBiddingFlagAKAPrime`)
 - **その他**: `AT_CHECKCODE`, `AT_RESULT_IND`, `AT_NONCE_MT`, `AT_VERSION_LIST`, `AT_SELECTED_VERSION`
+
+## RFC準拠アップデート (2026-02-20)
+
+RFC 4187 / RFC 5448 との整合性を高めるため、以下を修正しました。
+
+- `AT_RAND` / `AT_AUTN` の Value を `Reserved(2) + RAND/AUTN(16)` 形式で Marshal/Unmarshal するように修正（RFC 4187 準拠）。
+- `AT_PADDING` の検証を強化:
+  - Value長は `2` / `6` / `10` バイトのみ許可（属性全体長では `4` / `8` / `12` バイト）。
+  - Unmarshal時、全バイトが `0x00` であることを検証。
+- `AT_CHECKCODE` の長さ制約を追加（`0` / `20` / `32` バイトのみ許可）。
+
+互換性に関する注意:
+
+- これまでの非準拠な入力に依存していた場合、Marshal/Unmarshal の結果が変わる可能性があります。
+- RFC準拠の相手機器との相互接続性は、`AT_RAND` / `AT_AUTN` で改善されます。
 
 ## 参考文献
 
