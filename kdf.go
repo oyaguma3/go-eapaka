@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"errors"
+	"math/big"
 )
 
 // AkaKeys holds the key material derived for EAP-AKA (RFC 4187).
@@ -35,9 +36,8 @@ func DeriveKeysAKA(identity string, ck, ik []byte) AkaKeys {
 	h.Write(ck)
 	mk := h.Sum(nil) // 20 bytes
 
-	// Generate 160 bytes of key material using PRF(MK, 0)
-	// w (seed) is 0x00
-	keyBlock := prfGenAKA(mk, []byte{0x00}, 160)
+	// FIPS 186-2 PRF で 160バイトの鍵素材を生成
+	keyBlock := prfGenAKA(mk, 160)
 
 	// RFC 4187 Section 7: Key mapping
 	return AkaKeys{
@@ -117,30 +117,62 @@ func DeriveCKPrimeIKPrime(ck, ik []byte, netName string, autn []byte) (ckPrime, 
 // Internal PRF Implementations
 // -----------------------------------------------------------------------------
 
-// prfGenAKA implements the PRF based on FIPS 186-2 Change Notice 1 (SHA-1).
-// Used in EAP-AKA (RFC 4187).
-func prfGenAKA(key []byte, seed []byte, outputLen int) []byte {
+// prfGenAKA は FIPS 186-2 Change Notice 1 に基づく PRF を実装する。
+// RFC 4187 Section 7 / RFC 4186 Appendix B で参照される。
+//
+// アルゴリズム:
+//
+//	XKEY = MK (20バイト) をゼロパディングして64バイト
+//	t = SHA-1初期ハッシュ値
+//	for j = 0 to m-1:
+//	    w_0 = G(t, XKEY)                  // SHA-1圧縮関数（パディングなし）
+//	    XKEY = (1 + XKEY + w_0) mod 2^160  // 先頭20バイトのみ更新
+//	    w_1 = G(t, XKEY)
+//	    XKEY = (1 + XKEY + w_1) mod 2^160
+//	    output_j = w_0 || w_1              // 40バイト/イテレーション
+func prfGenAKA(mk []byte, outputLen int) []byte {
+	// mod 2^160 用の定数
+	mod2_160 := new(big.Int).Lsh(big.NewInt(1), 160) // 2^160
+	one := big.NewInt(1)
+
+	// XKEY = MK (20バイト) + ゼロパディング (44バイト) = 64バイトブロック
+	xkey := make([]byte, sha1Chunk)
+	copy(xkey, mk)
+
 	var output []byte
-	var current []byte
-	h := sha1.New()
 
-	// x_0 = SHA1(key | seed)
-	h.Write(key)
-	h.Write(seed)
-	current = h.Sum(nil)
-	output = append(output, current...)
-
-	// x_j = SHA1(key | x_{j-1})
 	for len(output) < outputLen {
-		h.Reset()
-		h.Write(key)
-		h.Write(current)
-		current = h.Sum(nil)
-		output = append(output, current...)
+		// 各イテレーションで2つの w を生成（w_0, w_1）
+		for i := 0; i < 2; i++ {
+			// G(t, XKEY) = SHA-1圧縮関数（SHA-1初期状態, XKEY）
+			w := sha1CompressToBytes(sha1InitH, xkey)
+			output = append(output, w...)
+
+			// XKEY = (1 + XKEY + w) mod 2^160
+			// xkey の先頭20バイトのみを更新（残り44バイトはゼロのまま）
+			xkeyInt := new(big.Int).SetBytes(xkey[:20])
+			wInt := new(big.Int).SetBytes(w)
+			xkeyInt.Add(xkeyInt, wInt)
+			xkeyInt.Add(xkeyInt, one)
+			xkeyInt.Mod(xkeyInt, mod2_160)
+
+			// big.Int.Bytes() は先頭ゼロを省略するため、20バイトに右詰めする
+			xkeyBytes := xkeyInt.Bytes()
+			// xkey の先頭20バイトをクリアして新しい値を設定
+			for j := 0; j < 20; j++ {
+				xkey[j] = 0
+			}
+			copy(xkey[20-len(xkeyBytes):20], xkeyBytes)
+
+			if len(output) >= outputLen {
+				break
+			}
+		}
 	}
 
 	return output[:outputLen]
 }
+
 
 // prfPlusIKEv2 implements PRF+ based on RFC 4306 (IKEv2).
 // Used in EAP-AKA' (RFC 5448). Uses HMAC-SHA-256.
