@@ -173,7 +173,6 @@ func prfGenAKA(mk []byte, outputLen int) []byte {
 	return output[:outputLen]
 }
 
-
 // prfPlusIKEv2 implements PRF+ based on RFC 4306 (IKEv2).
 // Used in EAP-AKA' (RFC 5448). Uses HMAC-SHA-256.
 func prfPlusIKEv2(key, seed []byte, outputLen int) []byte {
