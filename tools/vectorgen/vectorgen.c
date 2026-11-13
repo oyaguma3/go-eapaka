@@ -779,6 +779,7 @@ enum pkt_kind {
 	PKT_CHALLENGE_NEXT_IDS,
 	PKT_NOTIFICATION_AFTER_REAUTH,
 	PKT_NOTIFICATION_RESPONSE,
+	PKT_CHALLENGE_BIDDING,
 };
 
 struct pkt_input {
@@ -815,9 +816,23 @@ static const struct pkt_input pkt_inputs[] = {
 	  PKT_NOTIFICATION_AFTER_REAUTH, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
 	{ "aka_prime_notification_response", EAP_TYPE_AKA_PRIME,
 	  PKT_NOTIFICATION_RESPONSE, NULL },
+	/* 既存のケースの Identifier を変えないよう、新しいケースは末尾に足す */
+	{ "aka_challenge_bidding", EAP_TYPE_AKA, PKT_CHALLENGE_BIDDING, NULL },
 };
 
-static void gen_packets(const char *dir)
+/*
+ * RFC 9048 §4 に違反する（EAP-AKA' に AT_BIDDING を含む）パケット。
+ * go-eapaka の ParseOptions.AllowBiddingInAKAPrime で読み込み、MAC を検証する
+ * テストのために、意図的に作る。hostap の解析処理は方式を問わず AT_BIDDING を受け付ける。
+ */
+static const struct pkt_input bidding_violation_inputs[] = {
+	{ "aka_prime_challenge_bidding", EAP_TYPE_AKA_PRIME,
+	  PKT_CHALLENGE_BIDDING, NULL },
+};
+
+static void gen_packets(const char *dir, const char *file,
+			const char *source, const struct pkt_input *inputs,
+			size_t n)
 {
 	struct jw w;
 	size_t i;
@@ -828,13 +843,9 @@ static void gen_packets(const char *dir)
 	unhex(pkt_rand, rand, sizeof(rand));
 	unhex(pkt_autn, autn, sizeof(autn));
 
-	jw_open(&w, dir, "packets.json",
-		"hostap " HOSTAP_DESC ": eap_sim_msg_* (AT_IV, AT_ENCR_DATA, "
-		"AT_MAC), eap_sim_add_mac, eap_sim_add_mac_sha256, "
-		"eap_sim_verify_mac, eap_sim_verify_mac_sha256, "
-		"eap_sim_parse_encr");
-	for (i = 0; i < ARRAY_SIZE(pkt_inputs); i++) {
-		const struct pkt_input *in = &pkt_inputs[i];
+	jw_open(&w, dir, file, source);
+	for (i = 0; i < n; i++) {
+		const struct pkt_input *in = &inputs[i];
 		int prime = in->method == EAP_TYPE_AKA_PRIME;
 		const u8 *k_encr = prime ? akap1_k_encr : aka1_k_encr;
 		const u8 *k_aut = prime ? akap1_k_aut : aka1_k_aut;
@@ -862,6 +873,7 @@ static void gen_packets(const char *dir)
 			extra_len = sizeof(nonce_s);
 			break;
 		case PKT_CHALLENGE_NEXT_IDS:
+		case PKT_CHALLENGE_BIDDING:
 			code = EAP_CODE_REQUEST;
 			subtype = EAP_AKA_SUBTYPE_CHALLENGE;
 			break;
@@ -880,7 +892,8 @@ static void gen_packets(const char *dir)
 				       subtype);
 
 		/* 暗号化しない属性（AT_ENCR_DATA より前） */
-		if (in->kind == PKT_CHALLENGE_NEXT_IDS) {
+		if (in->kind == PKT_CHALLENGE_NEXT_IDS ||
+		    in->kind == PKT_CHALLENGE_BIDDING) {
 			eap_sim_msg_add(msg, EAP_SIM_AT_RAND, 0, rand,
 					sizeof(rand));
 			eap_sim_msg_add(msg, EAP_SIM_AT_AUTN, 0, autn,
@@ -893,6 +906,11 @@ static void gen_packets(const char *dir)
 						(const u8 *) RFC9048_C1_NETNAME,
 						os_strlen(RFC9048_C1_NETNAME));
 			}
+		}
+		if (in->kind == PKT_CHALLENGE_BIDDING) {
+			/* D ビット（EAP-AKA' を優先）を立てる。hostap のサーバと同じ */
+			eap_sim_msg_add(msg, EAP_SIM_AT_BIDDING,
+					EAP_AKA_BIDDING_FLAG_D, NULL, 0);
 		}
 		if (in->kind == PKT_NOTIFICATION_AFTER_REAUTH) {
 			/* 0 = General failure after authentication（P=0, S=0） */
@@ -996,7 +1014,19 @@ int main(int argc, char *argv[])
 	gen_reauth_keys_aka(argv[1]);
 	gen_reauth_keys_aka_prime(argv[1]);
 	gen_encr_data(argv[1]);
-	gen_packets(argv[1]);
+	gen_packets(argv[1], "packets.json",
+		    "hostap " HOSTAP_DESC ": eap_sim_msg_* (AT_IV, AT_ENCR_DATA, "
+		    "AT_MAC), eap_sim_add_mac, eap_sim_add_mac_sha256, "
+		    "eap_sim_verify_mac, eap_sim_verify_mac_sha256, "
+		    "eap_sim_parse_encr",
+		    pkt_inputs, ARRAY_SIZE(pkt_inputs));
+	gen_packets(argv[1], "packets_bidding_violation.json",
+		    "hostap " HOSTAP_DESC ": eap_sim_msg_*, "
+		    "eap_sim_add_mac_sha256, eap_sim_verify_mac_sha256; "
+		    "AT_BIDDING in EAP-AKA' packets, which RFC 9048 Section 4 "
+		    "does not allow, built on purpose",
+		    bidding_violation_inputs,
+		    ARRAY_SIZE(bidding_violation_inputs));
 
 	return 0;
 }

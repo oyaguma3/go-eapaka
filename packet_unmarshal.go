@@ -22,8 +22,10 @@ type ParseOptions struct {
 	// implementation under test and report the violation, instead of failing
 	// to parse the packet.
 	//
-	// Marshal still rejects AT_BIDDING in EAP-AKA' packets, so the MAC of such
-	// a packet cannot be calculated or verified with the Packet methods.
+	// Marshal still rejects AT_BIDDING in EAP-AKA' packets, but the MAC methods
+	// (VerifyMac, VerifyMacWithExtra, CalculateAndSetMac and
+	// CalculateAndSetMacWithExtra) accept it, so the MAC of such a packet can
+	// be verified.
 	AllowBiddingInAKAPrime bool
 }
 

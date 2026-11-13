@@ -44,6 +44,10 @@ func (p *Packet) CalculateAndSetMac(kAut []byte) error {
 // Among EAP-AKA/AKA' messages, only EAP-Response/AKA-Reauthentication has
 // message-specific data: the 16-byte NONCE_S from the server's AT_NONCE_S
 // (RFC 4187 Section 9.8). Other messages use no extra data (nil).
+//
+// Unlike Marshal, the MAC methods accept AT_BIDDING in EAP-AKA' packets, so
+// the MAC of such a packet read with ParseWithOptions (see
+// ParseOptions.AllowBiddingInAKAPrime) can be calculated and verified.
 func (p *Packet) CalculateAndSetMacWithExtra(kAut, extra []byte) error {
 	// 1. Find AT_MAC and zero it out
 	macAttr, err := p.findMacAttr()
@@ -53,7 +57,8 @@ func (p *Packet) CalculateAndSetMacWithExtra(kAut, extra []byte) error {
 	zeroMac(macAttr)
 
 	// 2. Marshal packet
-	data, err := p.Marshal()
+	// ParseWithOptions で読み込んだ、EAP-AKA' の AT_BIDDING を含むパケットも扱う
+	data, err := p.marshal(false)
 	if err != nil {
 		return err
 	}
@@ -82,7 +87,8 @@ func (p *Packet) VerifyMac(kAut []byte) (bool, error) {
 // in constant time, and the AT_MAC attribute is left unchanged.
 //
 // A server verifying EAP-Response/AKA-Reauthentication passes the NONCE_S it
-// sent in AT_NONCE_S as extra (RFC 4187 Section 9.8).
+// sent in AT_NONCE_S as extra (RFC 4187 Section 9.8). Like
+// CalculateAndSetMacWithExtra, it accepts AT_BIDDING in EAP-AKA' packets.
 func (p *Packet) VerifyMacWithExtra(kAut, extra []byte) (bool, error) {
 	// 1. Find AT_MAC
 	macAttr, err := p.findMacAttr()
@@ -95,7 +101,8 @@ func (p *Packet) VerifyMacWithExtra(kAut, extra []byte) (bool, error) {
 	zeroMac(macAttr)
 
 	// 3. Marshal
-	data, err := p.Marshal()
+	// ParseWithOptions で読み込んだ、EAP-AKA' の AT_BIDDING を含むパケットも扱う
+	data, err := p.marshal(false)
 	if err != nil {
 		// Restore
 		copy(macAttr.MAC, receivedMac)

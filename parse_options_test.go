@@ -1,6 +1,7 @@
 package eapaka
 
 import (
+	"bytes"
 	"strconv"
 	"strings"
 	"testing"
@@ -101,6 +102,68 @@ func TestParseWithOptions_SameAsParse(t *testing.T) {
 				if diff := cmp.Diff(want, got); diff != "" {
 					t.Errorf("opts %+v: packet mismatch with Parse (-Parse +ParseWithOptions):\n%s", opts, diff)
 				}
+			}
+		})
+	}
+}
+
+// TestParseWithOptions_BiddingViolationMac は、hostap が意図的に組み立てた
+// AT_BIDDING 入りの EAP-AKA' パケット（RFC 9048 §4 違反）を AllowBiddingInAKAPrime で
+// 読み込み、MAC を検証・計算し直せることを確かめる。
+func TestParseWithOptions_BiddingViolationMac(t *testing.T) {
+	for _, v := range loadVectors[packetVector](t, "packets_bidding_violation.json") {
+		t.Run(v.Name, func(t *testing.T) {
+			if _, err := Parse(v.Packet); err == nil {
+				t.Fatal("Parse accepted AT_BIDDING in an EAP-AKA' packet")
+			}
+			p, err := ParseWithOptions(v.Packet, ParseOptions{AllowBiddingInAKAPrime: true})
+			if err != nil {
+				t.Fatalf("ParseWithOptions: %v", err)
+			}
+			if p.Type != TypeAKAPrime {
+				t.Fatalf("Type = %d, want %d", p.Type, TypeAKAPrime)
+			}
+			var bidding *AtBidding
+			for _, a := range p.Attributes {
+				if b, ok := a.(*AtBidding); ok {
+					bidding = b
+				}
+			}
+			if bidding == nil || !bidding.SupportsAKAPrime() {
+				t.Fatalf("AT_BIDDING with the D bit not found: %#v", bidding)
+			}
+
+			// hostap の MAC を検証できる
+			for name, verify := range map[string]func() (bool, error){
+				"VerifyMac":          func() (bool, error) { return p.VerifyMac(v.KAut) },
+				"VerifyMacWithExtra": func() (bool, error) { return p.VerifyMacWithExtra(v.KAut, v.Extra) },
+			} {
+				if ok, err := verify(); err != nil || !ok {
+					t.Errorf("%s = %v, %v, want true, nil", name, ok, err)
+				}
+			}
+			wrongKey := bytes.Clone(v.KAut)
+			wrongKey[0] ^= 0x01
+			if ok, err := p.VerifyMac(wrongKey); err != nil || ok {
+				t.Errorf("VerifyMac with a wrong key = %v, %v, want false, nil", ok, err)
+			}
+
+			// 計算し直すと hostap の AT_MAC と一致する
+			mac, err := p.findMacAttr()
+			if err != nil {
+				t.Fatalf("findMacAttr: %v", err)
+			}
+			mac.MAC = bytes.Repeat([]byte{0xff}, 16)
+			if err := p.CalculateAndSetMac(v.KAut); err != nil {
+				t.Fatalf("CalculateAndSetMac: %v", err)
+			}
+			if diff := cmp.Diff([]byte(v.MAC), mac.MAC); diff != "" {
+				t.Errorf("AT_MAC mismatch (-want +got):\n%s", diff)
+			}
+
+			// Marshal は AT_BIDDING を拒否したまま
+			if _, err := p.Marshal(); err == nil {
+				t.Error("Marshal accepted AT_BIDDING in an EAP-AKA' packet")
 			}
 		})
 	}

@@ -133,6 +133,17 @@
       "extra": "",
       "mac": "71d2d8ea11ed656073d5fe6721797094",
       "packet": "024b001c320c00000b05000071d2d8ea11ed656073d5fe6721797094"
+    },
+    {
+      "name": "aka_challenge_bidding",
+      "method": "aka",
+      "k_encr": "18e8b20bcda70486fd5959586a9e7c3d",
+      "k_aut": "18c044070e5e642a2643876ff7a83812",
+      "iv": "",
+      "plaintext": "",
+      "extra": "",
+      "mac": "fa2b9ec131e4f677cc61b7e9873e31ba",
+      "packet": "014c00481701000001050000101112131415161718191a1b1c1d1e1f02050000202122232425262728292a2b2c2d2e2f880180000b050000fa2b9ec131e4f677cc61b7e9873e31ba"
     }
   ]
 }
