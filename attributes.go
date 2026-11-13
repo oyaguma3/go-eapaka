@@ -354,7 +354,7 @@ func (a *AtCheckcode) Marshal() ([]byte, error) {
 	if !isValidAtCheckcodeLen(len(a.Checkcode)) {
 		return nil, errors.New("AT_CHECKCODE must be 0, 20 (AKA), or 32 (AKA') bytes")
 	}
-	// RFC 5448: 2 bytes reserved + checkcode
+	// RFC 4187 Section 10.13 / RFC 9048 Section 3.4.3: 2 bytes reserved + checkcode
 	buf := make([]byte, 2+len(a.Checkcode))
 	copy(buf[2:], a.Checkcode)
 	return marshalAttribute(AT_CHECKCODE, buf)
@@ -390,11 +390,11 @@ func (a *AtPadding) Marshal() ([]byte, error) {
 }
 func (a *AtPadding) Unmarshal(data []byte) error {
 	if !isValidAtPaddingValueLen(len(data)) {
-		return errors.New("invalid AT_PADDING length")
+		return ErrPaddingLength
 	}
 	for _, b := range data {
 		if b != 0x00 {
-			return errors.New("AT_PADDING bytes must be zero")
+			return ErrPaddingNotZero
 		}
 	}
 	a.Length = len(data)
@@ -408,9 +408,9 @@ type AtKdfInput struct {
 
 func (a *AtKdfInput) Type() AttributeType { return AT_KDF_INPUT }
 func (a *AtKdfInput) Marshal() ([]byte, error) {
-	// RFC 5448: Actual Network Name Length (2 bytes) + Network Name
+	// RFC 9048 Section 3.1: Actual Network Name Length (2 bytes) + Network Name
 	if a.NetworkName == "" {
-		return nil, errors.New("AT_KDF_INPUT must be non-empty")
+		return nil, ErrEmptyKdfInput
 	}
 	return marshalLenPrefixedStringAttribute(AT_KDF_INPUT, a.NetworkName)
 }
@@ -420,7 +420,7 @@ func (a *AtKdfInput) Unmarshal(data []byte) error {
 		return err
 	}
 	if networkName == "" {
-		return errors.New("AT_KDF_INPUT must be non-empty")
+		return ErrEmptyKdfInput
 	}
 	a.NetworkName = networkName
 	return nil

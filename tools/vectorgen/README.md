@@ -50,6 +50,7 @@ make check     # 生成し直した結果が、コミット済みのベクタと
 | `encr_data.json` | hostap `eap_sim_msg_add_encr_start` / `_end`、`eap_sim_parse_encr` | AT_ENCR_DATA の平文と暗号文。AT_PADDING が 0・4・8・12 バイトのケースを含む（RFC 4187 §10.12） |
 | `packets.json` | hostap `eap_sim_msg_*`、`eap_sim_add_mac(_sha256)`、`eap_sim_verify_mac(_sha256)` | AT_IV・AT_ENCR_DATA・AT_MAC を含む完成したパケット。再認証の応答の MAC は NONCE_S を追加データにして計算する（RFC 4187 §9.8） |
 | `packets_bidding_violation.json` | hostap `eap_sim_msg_*`、`eap_sim_add_mac_sha256`、`eap_sim_verify_mac_sha256` | RFC 9048 §4 に違反する、AT_BIDDING を含む EAP-AKA' のパケット。`ParseOptions.AllowBiddingInAKAPrime` で読み込んで MAC を検証するテストのために、意図的に作る。既定の `Parse` で読むテストに混ざらないよう、`packets.json` とは別のファイルにしている |
+| `packets_reserved_nonzero.json` | hostap `eap_sim_msg_*`、`aes_128_cbc_encrypt`、`eap_sim_add_mac(_sha256)`、`eap_sim_verify_mac(_sha256)`、`eap_sim_parse_encr` | AT_RAND・AT_AUTN・AT_RESULT_IND・AT_IV・AT_ENCR_DATA の Reserved を意図的に 0 以外にしたパケット。受信したバイト列のまま MAC を検証する `VerifyMacRaw` のテストに使う。AT_MAC 自身の Reserved は 0 |
 | `mppe.json` | Python `hashlib.md5`（hostap `radius.c` で照合） | MS-MPPE-Send/Recv-Key の暗号化（RFC 2548 §2.4.2） |
 | `checkcode.json` | Python `hashlib.sha1` / `sha256` | AT_CHECKCODE（RFC 4187 §10.13、RFC 9048 §3.4.3） |
 

@@ -4,7 +4,6 @@ import (
 	"crypto/md5"
 	"crypto/rand"
 	"errors"
-	"fmt"
 	"slices"
 )
 
@@ -109,7 +108,7 @@ func DecryptMPPEKey(enc, secret, reqAuth []byte) ([]byte, error) {
 		return nil, errors.New("eapaka: invalid Request Authenticator length")
 	}
 	if len(enc) < 2+16 || (len(enc)-2)%16 != 0 {
-		return nil, fmt.Errorf("eapaka: invalid MPPE key attribute length %d (want the Salt and a positive multiple of 16 bytes)", len(enc))
+		return nil, wrapErrorf(ErrMalformedMPPEKey, "eapaka: invalid MPPE key attribute length %d (want the Salt and a positive multiple of 16 bytes)", len(enc))
 	}
 	salt, ciphertext := enc[:2], enc[2:]
 
@@ -131,7 +130,7 @@ func DecryptMPPEKey(enc, secret, reqAuth []byte) ([]byte, error) {
 	// P = Key-Length（1 バイト）| Key | Padding
 	keyLen := int(plain[0])
 	if keyLen == 0 || keyLen > len(plain)-1 {
-		return nil, fmt.Errorf("eapaka: invalid MPPE Key-Length %d for %d bytes of decrypted data", keyLen, len(plain))
+		return nil, wrapErrorf(ErrMalformedMPPEKey, "eapaka: invalid MPPE Key-Length %d for %d bytes of decrypted data", keyLen, len(plain))
 	}
 	return plain[1 : 1+keyLen], nil
 }

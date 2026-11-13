@@ -1,10 +1,6 @@
 package eapaka
 
-import (
-	"encoding/binary"
-	"errors"
-	"fmt"
-)
+import "encoding/binary"
 
 // Parse parses an EAP packet from a byte slice.
 //
@@ -33,7 +29,7 @@ type ParseOptions struct {
 // checks relaxed as specified by opts.
 func ParseWithOptions(data []byte, opts ParseOptions) (*Packet, error) {
 	if len(data) < 4 {
-		return nil, errors.New("packet too short")
+		return nil, wrapErrorf(ErrMalformedPacket, "packet too short")
 	}
 
 	p := &Packet{}
@@ -42,10 +38,10 @@ func ParseWithOptions(data []byte, opts ParseOptions) (*Packet, error) {
 	length := binary.BigEndian.Uint16(data[2:4])
 
 	if length < 4 {
-		return nil, errors.New("packet length too small")
+		return nil, wrapErrorf(ErrMalformedPacket, "packet length too small")
 	}
 	if int(length) > len(data) {
-		return nil, errors.New("packet length mismatch")
+		return nil, wrapErrorf(ErrMalformedPacket, "packet length mismatch")
 	}
 	// Use only the slice indicated by length
 	payload := data[4:length]
@@ -53,13 +49,13 @@ func ParseWithOptions(data []byte, opts ParseOptions) (*Packet, error) {
 	// If Success or Failure, no more data expected
 	if p.Code == CodeSuccess || p.Code == CodeFailure {
 		if len(payload) != 0 {
-			return nil, errors.New("unexpected data in success/failure packet")
+			return nil, wrapErrorf(ErrMalformedPacket, "unexpected data in success/failure packet")
 		}
 		return p, nil
 	}
 
 	if len(payload) == 0 {
-		return nil, errors.New("missing EAP type")
+		return nil, wrapErrorf(ErrMalformedPacket, "missing EAP type")
 	}
 
 	p.Type = payload[0]
@@ -70,7 +66,7 @@ func ParseWithOptions(data []byte, opts ParseOptions) (*Packet, error) {
 	}
 
 	if len(payload) < 4 {
-		return nil, errors.New("invalid EAP-AKA header")
+		return nil, wrapErrorf(ErrMalformedPacket, "invalid EAP-AKA header")
 	}
 
 	p.Subtype = payload[1]
@@ -104,19 +100,19 @@ func parseAttributes(data []byte, rejectBidding bool) ([]Attribute, error) {
 	offset := 0
 	for offset < len(data) {
 		if offset+2 > len(data) {
-			return nil, errors.New("attribute header truncated")
+			return nil, wrapErrorf(ErrMalformedAttribute, "attribute header truncated")
 		}
 		attrType := AttributeType(data[offset])
 		attrLen := int(data[offset+1]) * 4 // Length in bytes
 
 		if attrLen == 0 {
-			return nil, errors.New("attribute length zero")
+			return nil, wrapErrorf(ErrMalformedAttribute, "attribute length zero")
 		}
 		if offset+attrLen > len(data) {
-			return nil, fmt.Errorf("attribute %d length overflow", attrType)
+			return nil, wrapErrorf(ErrMalformedAttribute, "attribute %d length overflow", attrType)
 		}
 		if rejectBidding && attrType == AT_BIDDING {
-			return nil, errors.New("AT_BIDDING is only valid for EAP-AKA")
+			return nil, ErrBiddingInAKAPrime
 		}
 
 		// Value is after Type(1) + Length(1) = 2 bytes

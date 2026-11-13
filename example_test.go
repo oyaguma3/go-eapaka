@@ -3,6 +3,7 @@ package eapaka_test
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
 
 	"github.com/oyaguma3/go-eapaka"
@@ -240,4 +241,58 @@ func ExampleDecryptMPPEKey() {
 	fmt.Println(bytes.Equal(got, key), enc[0]&0x80 != 0)
 	// Output:
 	// true true
+}
+
+// ExampleVerifyMacRaw verifies the MAC over the bytes as received when the
+// sender set a reserved field to a non-zero value.
+func ExampleVerifyMacRaw() {
+	kAut := mustHex("101112131415161718191a1b1c1d1e1f")
+	pkt := &eapaka.Packet{
+		Code:       eapaka.CodeRequest,
+		Identifier: 1,
+		Type:       eapaka.TypeAKA,
+		Subtype:    eapaka.SubtypeChallenge,
+		Attributes: []eapaka.Attribute{
+			&eapaka.AtRand{Rand: make([]byte, 16)},
+			&eapaka.AtMac{},
+		},
+	}
+	data, err := pkt.Marshal()
+	if err != nil {
+		panic(err)
+	}
+	// The sender sets the Reserved field of AT_RAND (bytes 10-11) to a
+	// non-zero value and calculates the MAC over those bytes.
+	data[10] = 0x01
+	if err := eapaka.CalculateAndSetMacRaw(data, kAut, nil); err != nil {
+		panic(err)
+	}
+
+	parsed, err := eapaka.Parse(data)
+	if err != nil {
+		panic(err)
+	}
+	fromParsed, _ := parsed.VerifyMac(kAut)              // re-marshaled: Reserved becomes zero
+	fromBytes, _ := eapaka.VerifyMacRaw(data, kAut, nil) // as received
+	fmt.Println(fromParsed, fromBytes)
+	// Output:
+	// false true
+}
+
+// ExampleAttributeError classifies a parse error with errors.Is and gets the
+// attribute type with errors.AsType.
+func ExampleAttributeError() {
+	// EAP-Request/AKA-Notification with an AT_PADDING whose pad bytes are not zero
+	raw := []byte{0x01, 0x01, 0x00, 0x0c, 23, 12, 0x00, 0x00, 0x06, 0x01, 0x00, 0x01}
+	_, err := eapaka.Parse(raw)
+
+	fmt.Println(errors.Is(err, eapaka.ErrPaddingNotZero), errors.Is(err, eapaka.ErrMalformedAttribute))
+	if attrErr, ok := errors.AsType[*eapaka.AttributeError](err); ok {
+		fmt.Println(attrErr.Type == eapaka.AT_PADDING)
+	}
+	fmt.Println(err)
+	// Output:
+	// true true
+	// true
+	// failed to unmarshal attribute type 6: AT_PADDING bytes must be zero
 }

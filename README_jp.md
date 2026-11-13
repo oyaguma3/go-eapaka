@@ -234,6 +234,43 @@ pkt, err := eapaka.ParseWithOptions(data, eapaka.ParseOptions{AllowBiddingInAKAP
 ok, err := pkt.VerifyMac(kAut) // MAC の関数は AT_BIDDING を受け付ける。Marshal は引き続き拒否する
 ```
 
+### 受信したバイト列での MAC の検証
+
+`Packet.VerifyMac` は、解析した属性から組み立て直したパケット（予約フィールドは 0 になる）で MAC を計算します。そのため、送信側が予約フィールドを 0 以外にしていると（RFC 4187 では受信側は無視する）、MAC が正しくても一致しません。`VerifyMacRaw` は受信したバイト列のまま MAC を検証し、`CalculateAndSetMacRaw` は与えたバイト列のまま MAC を計算します。
+
+```go
+ok, err := eapaka.VerifyMacRaw(data, kAut, nonceS) // nonceS は EAP-Response/AKA-Reauthentication のときだけ。それ以外は nil
+```
+
+RFC 4187 Section 10.15 では MAC の計算時に AT_MAC の値フィールド全体（Reserved と MAC）を 0 にしますが、hostap は MAC 部分だけを 0 にします。AT_MAC の Reserved が 0 以外のとき、`VerifyMacRaw` はどちらの方法の MAC も受け付け、`CalculateAndSetMacRaw` は RFC の方法で計算します。
+
+### エラー
+
+受信データの異常によるエラーは sentinel error を包んでいるので、`errors.Is` で判定できます。エラーメッセージは従来と同じです。
+
+| sentinel error | 意味 |
+|---|---|
+| `ErrMalformedPacket` | EAP ヘッダ・Length・EAP-AKA ヘッダの異常、AT_MAC が複数ある |
+| `ErrMalformedAttribute` | 属性ヘッダの途中で終わる、Length が 0、Length がデータを超える、値を解析できない |
+| `ErrBiddingInAKAPrime` | EAP-AKA' のパケットに AT_BIDDING がある（RFC 9048 Section 4） |
+| `ErrEncrDataLength` | AT_ENCR_DATA が 16 バイトの正の倍数でない |
+| `ErrPaddingLength` / `ErrPaddingNotZero` / `ErrPaddingNotLast` | AT_PADDING の長さ・ゼロ埋め・位置の異常（RFC 4187 Section 10.12） |
+| `ErrMacNotFound` | AT_MAC がない |
+| `ErrEmptyKdfInput` | AT_KDF_INPUT が空（RFC 9048 Section 3.1） |
+| `ErrMalformedMPPEKey` | MS-MPPE 鍵の属性の長さや Key-Length の異常 |
+
+値を解析できない属性は `*AttributeError` で報告され、`ErrMalformedAttribute` と個別の原因の両方に一致します。
+
+```go
+_, err := eapaka.Parse(data)
+if errors.Is(err, eapaka.ErrPaddingNotZero) {
+	// ...
+}
+if attrErr, ok := errors.AsType[*eapaka.AttributeError](err); ok {
+	fmt.Println("malformed attribute type", attrErr.Type)
+}
+```
+
 ## サポートしている属性
 
 **注意**: 本ライブラリは属性ヘッダー (Type, Length) とパディングの処理のみを行います。属性値（データ部分）については、RFCの定義に従って利用者自身がバイト列を構築し、対応するフィールド（`Rand`, `Autn`, `Identity` 等）に格納する必要があります。`AT_RAND` と `AT_AUTN` は 16バイトの `Rand`/`Autn` だけを指定してください（`Reserved(2)` はライブラリ内部で処理されます）。
@@ -249,6 +286,12 @@ ok, err := pkt.VerifyMac(kAut) // MAC の関数は AT_BIDDING を受け付ける
 ## テストベクタ
 
 暗号処理の関数は、本ライブラリとは独立した実装である hostap 2.12（hostapd / wpa_supplicant）と Python の標準ライブラリから生成したベクタで検証しています。ベクタは `testdata/vectors` にあり、生成プログラムと再生成・照合の手順は `tools/vectorgen` にあります（`make -C tools/vectorgen check`）。
+
+## v0.3.0 の変更点
+
+- 受信したバイト列（または与えたバイト列）のまま MAC を計算・検証する `VerifyMacRaw` と `CalculateAndSetMacRaw` を追加。
+- sentinel error（`ErrMalformedPacket`、`ErrMalformedAttribute`、`ErrBiddingInAKAPrime`、`ErrEncrDataLength`、`ErrPaddingLength`、`ErrPaddingNotZero`、`ErrPaddingNotLast`、`ErrMacNotFound`、`ErrEmptyKdfInput`、`ErrMalformedMPPEKey`）と `AttributeError` を追加。エラーメッセージは変えていません。
+- コードのコメントの参照先を RFC 5448 から RFC 9048 に変更。
 
 ## v0.2.0 の変更点
 

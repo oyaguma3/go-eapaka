@@ -1,9 +1,5 @@
 package eapaka
 
-import (
-	"fmt"
-)
-
 // decodeAttribute creates a specific Attribute struct based on the type and unmarshals the data.
 func decodeAttribute(t AttributeType, data []byte) (Attribute, error) {
 	var attr Attribute
@@ -69,7 +65,7 @@ func decodeAttribute(t AttributeType, data []byte) (Attribute, error) {
 	}
 
 	if err := attr.Unmarshal(data); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal attribute type %d: %w", t, err)
+		return nil, &AttributeError{Type: t, Err: err}
 	}
 
 	return attr, nil

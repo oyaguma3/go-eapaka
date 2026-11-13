@@ -34,7 +34,7 @@ func (p *Packet) marshal(rejectBidding bool) ([]byte, error) {
 
 		for _, attr := range p.Attributes {
 			if rejectBidding && p.Type == TypeAKAPrime && attr.Type() == AT_BIDDING {
-				return nil, errors.New("AT_BIDDING is only valid for EAP-AKA")
+				return nil, ErrBiddingInAKAPrime
 			}
 			b, err := attr.Marshal()
 			if err != nil {

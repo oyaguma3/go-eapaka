@@ -19,7 +19,7 @@ type AkaKeys struct {
 	MK     []byte // 160 bits (20 bytes) - Master Key, input to DeriveReauthKeysAKA
 }
 
-// AkaPrimeKeys holds the key material derived for EAP-AKA' (RFC 5448).
+// AkaPrimeKeys holds the key material derived for EAP-AKA' (RFC 9048).
 type AkaPrimeKeys struct {
 	K_encr []byte // 128 bits (16 bytes)
 	K_aut  []byte // 256 bits (32 bytes) - Note: Larger than AKA
@@ -52,11 +52,11 @@ func DeriveKeysAKA(identity string, ck, ik []byte) AkaKeys {
 	}
 }
 
-// DeriveKeysAKAPrime derives the key hierarchy for EAP-AKA' as per RFC 5448.
+// DeriveKeysAKAPrime derives the key hierarchy for EAP-AKA' as per RFC 9048 Section 3.3.
 // identity: The EAP Identity (NAI).
 // ckPrime, ikPrime: CK' and IK' derived from CK/IK and Network Name.
 func DeriveKeysAKAPrime(identity string, ckPrime, ikPrime []byte) AkaPrimeKeys {
-	// RFC 5448 Section 3.3
+	// RFC 9048 Section 3.3
 	// MK is calculated as part of the PRF' generation
 	// Key for PRF' is IK'|CK'
 	key := append(append([]byte{}, ikPrime...), ckPrime...)
@@ -65,7 +65,7 @@ func DeriveKeysAKAPrime(identity string, ckPrime, ikPrime []byte) AkaPrimeKeys {
 	seed := append([]byte("EAP-AKA'"), []byte(identity)...)
 
 	// Total bytes needed: 16 + 32 + 32 + 64 + 64 = 208 bytes
-	// RFC 5448 calls the output of this PRF' "MK"
+	// RFC 9048 calls the output of this PRF' "MK"
 	keyBlock := prfPlusIKEv2(key, seed, 208)
 
 	return AkaPrimeKeys{
@@ -89,7 +89,7 @@ func DeriveCKPrimeIKPrime(ck, ik []byte, netName string, autn []byte) (ckPrime, 
 		return nil, nil, errors.New("AUTN must be at least 6 bytes")
 	}
 	if netName == "" {
-		return nil, nil, errors.New("AT_KDF_INPUT must be non-empty")
+		return nil, nil, ErrEmptyKdfInput
 	}
 
 	// SQN xor AK is the first 6 bytes of AUTN.
@@ -268,7 +268,7 @@ func prfGenAKA(mk []byte, outputLen int) []byte {
 }
 
 // prfPlusIKEv2 implements PRF+ based on RFC 4306 (IKEv2).
-// Used in EAP-AKA' (RFC 5448). Uses HMAC-SHA-256.
+// Used in EAP-AKA' (RFC 9048). Uses HMAC-SHA-256.
 func prfPlusIKEv2(key, seed []byte, outputLen int) []byte {
 	var output []byte
 	var current []byte
