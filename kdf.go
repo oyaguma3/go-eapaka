@@ -89,7 +89,7 @@ func DeriveCKPrimeIKPrime(ck, ik []byte, netName string, autn []byte) (ckPrime, 
 		return nil, nil, errors.New("AUTN must be at least 6 bytes")
 	}
 	if netName == "" {
-		return nil, nil, errors.New("AT_KDF_INPUT must be non-empty")
+		return nil, nil, ErrEmptyKdfInput
 	}
 
 	// SQN xor AK is the first 6 bytes of AUTN.

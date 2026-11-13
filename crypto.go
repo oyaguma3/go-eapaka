@@ -15,7 +15,7 @@ func (p *Packet) findMacAttr() (*AtMac, error) {
 			return m, nil
 		}
 	}
-	return nil, errors.New("AT_MAC attribute not found")
+	return nil, ErrMacNotFound
 }
 
 func zeroMac(macAttr *AtMac) {

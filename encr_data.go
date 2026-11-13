@@ -96,7 +96,7 @@ func DecryptAttributes(kEncr, iv, ciphertext []byte) ([]Attribute, error) {
 		return nil, err
 	}
 	if len(ciphertext) == 0 || len(ciphertext)%aes.BlockSize != 0 {
-		return nil, fmt.Errorf("AT_ENCR_DATA length %d is not a positive multiple of %d", len(ciphertext), aes.BlockSize)
+		return nil, wrapErrorf(ErrEncrDataLength, "AT_ENCR_DATA length %d is not a positive multiple of %d", len(ciphertext), aes.BlockSize)
 	}
 
 	plain := make([]byte, len(ciphertext))
@@ -109,7 +109,7 @@ func DecryptAttributes(kEncr, iv, ciphertext []byte) ([]Attribute, error) {
 	}
 	if i := slices.IndexFunc(attrs, func(a Attribute) bool { return a.Type() == AT_PADDING }); i >= 0 {
 		if i != len(attrs)-1 {
-			return nil, errors.New("AT_PADDING is not the last attribute in AT_ENCR_DATA")
+			return nil, ErrPaddingNotLast
 		}
 		attrs = attrs[:i]
 	}

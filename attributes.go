@@ -390,11 +390,11 @@ func (a *AtPadding) Marshal() ([]byte, error) {
 }
 func (a *AtPadding) Unmarshal(data []byte) error {
 	if !isValidAtPaddingValueLen(len(data)) {
-		return errors.New("invalid AT_PADDING length")
+		return ErrPaddingLength
 	}
 	for _, b := range data {
 		if b != 0x00 {
-			return errors.New("AT_PADDING bytes must be zero")
+			return ErrPaddingNotZero
 		}
 	}
 	a.Length = len(data)
@@ -410,7 +410,7 @@ func (a *AtKdfInput) Type() AttributeType { return AT_KDF_INPUT }
 func (a *AtKdfInput) Marshal() ([]byte, error) {
 	// RFC 9048 Section 3.1: Actual Network Name Length (2 bytes) + Network Name
 	if a.NetworkName == "" {
-		return nil, errors.New("AT_KDF_INPUT must be non-empty")
+		return nil, ErrEmptyKdfInput
 	}
 	return marshalLenPrefixedStringAttribute(AT_KDF_INPUT, a.NetworkName)
 }
@@ -420,7 +420,7 @@ func (a *AtKdfInput) Unmarshal(data []byte) error {
 		return err
 	}
 	if networkName == "" {
-		return errors.New("AT_KDF_INPUT must be non-empty")
+		return ErrEmptyKdfInput
 	}
 	a.NetworkName = networkName
 	return nil
