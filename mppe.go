@@ -34,9 +34,9 @@ func EncryptMPPEKey(key []byte, secret []byte, reqAuth []byte) ([]byte, error) {
 	// RFC 2548: "The length of the ... length + key + padding must be a multiple of 16"
 	// Note: RFC says "salt + length + key + padding", but the salt is NOT encrypted.
 	// The encrypted portion P is [Length + Key + Padding].
-	
+
 	plainLen := 1 + len(key)
-	
+
 	// Calculate padding needed to make P a multiple of 16
 	padLen := (16 - (plainLen % 16)) % 16
 
@@ -61,7 +61,7 @@ func EncryptMPPEKey(key []byte, secret []byte, reqAuth []byte) ([]byte, error) {
 
 	// c(i) = p(i) ^ b(i)
 	// Encrypted blocks start at offset 2 in result
-	
+
 	for i := 0; i < len(plaintext); i += 16 {
 		pBlock := plaintext[i : i+16]
 		cBlock := result[2+i : 2+i+16] // Write directly to result
