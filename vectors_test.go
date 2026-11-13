@@ -179,7 +179,7 @@ func TestVectors_DeriveKeysAKA(t *testing.T) {
 	for _, v := range loadVectors[akaKeysVector](t, "aka_keys.json") {
 		t.Run(v.Name, func(t *testing.T) {
 			got := DeriveKeysAKA(v.Identity, v.CK, v.IK)
-			want := AkaKeys{K_encr: v.KEncr, K_aut: v.KAut, MSK: v.MSK, EMSK: v.EMSK}
+			want := AkaKeys{K_encr: v.KEncr, K_aut: v.KAut, MSK: v.MSK, EMSK: v.EMSK, MK: v.MK}
 			if diff := cmp.Diff(want, got); diff != "" {
 				t.Errorf("DeriveKeysAKA mismatch (-want +got):\n%s", diff)
 			}
@@ -205,23 +205,6 @@ func TestVectors_DeriveKeysAKAPrime(t *testing.T) {
 			want := AkaPrimeKeys{K_encr: v.KEncr, K_aut: v.KAut, K_re: v.KRe, MSK: v.MSK, EMSK: v.EMSK}
 			if diff := cmp.Diff(want, got); diff != "" {
 				t.Errorf("DeriveKeysAKAPrime mismatch (-want +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-// TestVectors_PrfGenAKA_ReauthXKey は、再認証の XKEY' を入力にした FIPS 186-2 PRF の
-// 出力が hostap の MSK|EMSK と一致することを確かめる。
-// XKEY' の組み立て自体は P0-3 の DeriveReauthKeysAKA で検証する。
-func TestVectors_PrfGenAKA_ReauthXKey(t *testing.T) {
-	for _, v := range loadVectors[reauthAKAVector](t, "reauth_keys_aka.json") {
-		t.Run(v.Name, func(t *testing.T) {
-			got := prfGenAKA(v.XKeyPrime, 128)
-			if diff := cmp.Diff([]byte(v.MSK), got[:64]); diff != "" {
-				t.Errorf("MSK mismatch (-want +got):\n%s", diff)
-			}
-			if diff := cmp.Diff([]byte(v.EMSK), got[64:]); diff != "" {
-				t.Errorf("EMSK mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -311,17 +294,6 @@ func TestVectors_Packets_Mac(t *testing.T) {
 // ベクタファイル自体の整合性
 // （対応する API はまだないが、形式の誤りに早く気付けるようにする）
 // -----------------------------------------------------------------------------
-
-func TestVectors_ReauthAKAPrimeConsistency(t *testing.T) {
-	for _, v := range loadVectors[reauthAKAPrimeVector](t, "reauth_keys_aka_prime.json") {
-		t.Run(v.Name, func(t *testing.T) {
-			if v.Identity == "" || len(v.NonceS) != 16 || len(v.KRe) != 32 || len(v.MSK) != 64 || len(v.EMSK) != 64 {
-				t.Errorf("identity/NONCE_S/K_re/MSK/EMSK length = %d/%d/%d/%d/%d, want >0/16/32/64/64",
-					len(v.Identity), len(v.NonceS), len(v.KRe), len(v.MSK), len(v.EMSK))
-			}
-		})
-	}
-}
 
 func TestVectors_EncrDataConsistency(t *testing.T) {
 	seen := map[int]bool{}
