@@ -232,6 +232,43 @@ pkt, err := eapaka.ParseWithOptions(data, eapaka.ParseOptions{AllowBiddingInAKAP
 ok, err := pkt.VerifyMac(kAut) // The MAC methods accept AT_BIDDING; Marshal still rejects it.
 ```
 
+### Verifying the MAC over Received Bytes
+
+`Packet.VerifyMac` calculates the MAC over a packet re-marshaled from the parsed attributes, in which reserved fields are zero. If the sender set a reserved field to a non-zero value (which RFC 4187 says is ignored on reception), a valid MAC does not match. `VerifyMacRaw` verifies the MAC over the bytes as received, and `CalculateAndSetMacRaw` calculates it over the bytes as given.
+
+```go
+ok, err := eapaka.VerifyMacRaw(data, kAut, nonceS) // nonceS only for EAP-Response/AKA-Reauthentication; otherwise nil
+```
+
+RFC 4187 Section 10.15 zeroes the whole value field of AT_MAC (Reserved and MAC) when calculating the MAC, whereas hostap zeroes only the MAC. `VerifyMacRaw` accepts either when the Reserved field of AT_MAC is non-zero; `CalculateAndSetMacRaw` follows the RFC.
+
+### Errors
+
+Errors for malformed input wrap sentinel errors, which can be tested with `errors.Is`. The error messages are the same as in earlier versions.
+
+| Sentinel error | Meaning |
+|---|---|
+| `ErrMalformedPacket` | Invalid EAP header, Length or EAP-AKA header, or more than one AT_MAC |
+| `ErrMalformedAttribute` | Truncated or zero-length attribute, Length beyond the data, or a value that cannot be parsed |
+| `ErrBiddingInAKAPrime` | AT_BIDDING in an EAP-AKA' packet (RFC 9048 Section 4) |
+| `ErrEncrDataLength` | AT_ENCR_DATA is not a positive multiple of 16 bytes |
+| `ErrPaddingLength` / `ErrPaddingNotZero` / `ErrPaddingNotLast` | AT_PADDING length, pad bytes or position (RFC 4187 Section 10.12) |
+| `ErrMacNotFound` | No AT_MAC |
+| `ErrEmptyKdfInput` | Empty AT_KDF_INPUT (RFC 9048 Section 3.1) |
+| `ErrMalformedMPPEKey` | MS-MPPE key attribute with an invalid length or Key-Length |
+
+An attribute value that cannot be parsed is reported as `*AttributeError`, which matches `ErrMalformedAttribute` and the specific cause:
+
+```go
+_, err := eapaka.Parse(data)
+if errors.Is(err, eapaka.ErrPaddingNotZero) {
+	// ...
+}
+if attrErr, ok := errors.AsType[*eapaka.AttributeError](err); ok {
+	fmt.Println("malformed attribute type", attrErr.Type)
+}
+```
+
 ## Supported Attributes
 
 **Note**: This library handles the attribute headers (Type and Length) and padding. For the attribute value (data), you must construct the byte slice yourself according to the RFC definitions and assign it to the corresponding field (e.g., `Rand`, `Autn`, `Identity`). For `AT_RAND` and `AT_AUTN`, pass only 16-byte `Rand`/`Autn`; the `Reserved(2)` bytes are handled internally.
@@ -247,6 +284,12 @@ ok, err := pkt.VerifyMac(kAut) // The MAC methods accept AT_BIDDING; Marshal sti
 ## Test Vectors
 
 The cryptographic helpers are tested against vectors generated from implementations independent of this library: hostap 2.12 (hostapd / wpa_supplicant) and the Python standard library. The vectors are in `testdata/vectors`. `tools/vectorgen` contains the generators and the instructions to regenerate and check them (`make -C tools/vectorgen check`).
+
+## Changes in v0.3.0
+
+- Added `VerifyMacRaw` and `CalculateAndSetMacRaw`, which calculate and verify the MAC over packet bytes as received or as given.
+- Added sentinel errors (`ErrMalformedPacket`, `ErrMalformedAttribute`, `ErrBiddingInAKAPrime`, `ErrEncrDataLength`, `ErrPaddingLength`, `ErrPaddingNotZero`, `ErrPaddingNotLast`, `ErrMacNotFound`, `ErrEmptyKdfInput`, `ErrMalformedMPPEKey`) and `AttributeError`. Error messages are unchanged.
+- Code comments refer to RFC 9048 instead of RFC 5448.
 
 ## Changes in v0.2.0
 

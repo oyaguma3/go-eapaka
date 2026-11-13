@@ -29,7 +29,8 @@ go-eapaka/
 ├── attributes_decoder.go # Attribute解析用のファクトリー関数
 ├── notification.go       # AT_NOTIFICATION のコード値の定数と変換 (FullCode, NewNotification)
 ├── encr_data.go          # AT_ENCR_DATA の暗号化・復号 (EncryptAttributes, DecryptAttributes, NewIV)
-├── crypto.go             # MAC (HMAC-SHA1/256) 計算・検証ロジック（追加データ付きを含む）
+├── crypto.go             # MAC (HMAC-SHA1/256) 計算・検証ロジック（追加データ付き、受信したバイト列でのものを含む）
+├── errors.go             # sentinel error と AttributeError
 ├── kdf.go                # 鍵導出（フル認証・再認証）と PRF
 ├── kdf_negotiation.go    # AT_KDF の交渉の補助
 ├── checkcode.go          # AT_CHECKCODE の計算 (ComputeCheckcode)
@@ -207,7 +208,11 @@ RFC 3748 および RFC 4187 に従い、以下の順序で検証を行います�
 - **追加データ付きの MAC（CalculateAndSetMacWithExtra / VerifyMacWithExtra）:**
     - MAC は「EAP パケット | メッセージ固有のデータ」に対して計算する（RFC 4187 Section 10.15）。EAP-AKA/AKA' でメッセージ固有のデータを使うのは EAP-Response/AKA-Reauthentication だけで、サーバが送った `NONCE_S` をつなぐ（Section 9.8）。
     - 既存の `CalculateAndSetMac` / `VerifyMac` は、追加データなし（nil）で新しいメソッドを呼ぶ。
-- **既知の制約:** MAC は受信したバイト列ではなく、解析した構造体から組み立て直したバイト列で計算する。そのため、送信側が予約フィールドを 0 以外にしていると、MAC が正しくても検証に失敗する。
+- **Packet のメソッドの制約:** 上のメソッドは、解析した構造体から組み立て直したバイト列（予約フィールドは 0 になる）で MAC を計算する。そのため、送信側が予約フィールドを 0 以外にしていると、MAC が正しくても一致しない。
+- **受信したバイト列での MAC（VerifyMacRaw / CalculateAndSetMacRaw、v0.3.0）:**
+    - 属性の値は解析せずに AT_MAC の位置だけを探し、受信した（与えられた）バイト列のまま MAC を計算する。EAP ヘッダの Length より後ろのバイトは無視する。EAP-AKA' の AT_BIDDING は拒否しない。
+    - RFC 4187 Section 10.15 は AT_MAC の値フィールド全体（Reserved と MAC）を 0 にして計算するが、hostap は MAC 部分だけを 0 にする。両者が違うのは AT_MAC の Reserved が 0 以外のときだけで、`VerifyMacRaw` はどちらの方法の MAC も受け付ける（候補が 2 つになることによる安全性の低下は 2^-128 が 2^-127 になる程度）。`CalculateAndSetMacRaw` は RFC の方法で計算し、AT_MAC の Reserved は与えられた値のまま残す。
+    - テストツールは、`VerifyMacRaw` で MAC を検証したうえで、予約フィールドが 0 でないことを別の違反として記録できる。
 
 ### 4.5 AT_ENCR_DATA（RFC 4187 Section 10.12）
 
@@ -240,6 +245,24 @@ RFC 3748 および RFC 4187 に従い、以下の順序で検証を行います�
 
 - **SessionIDAKA:** `0x17 || RAND || AUTN`。RFC 5247 には EAP-AKA の再認証の定義がない（hostap は EAP-AKA' と同じ形の `0x17 || NONCE_S || MAC` を使う）。
 - **SessionIDAKAPrime / SessionIDAKAPrimeReauth:** `0x32 || RAND || AUTN`、`0x32 || NONCE_S || MAC`。
+
+### 4.10 エラー（v0.3.0）
+
+受信データの異常によるエラーは sentinel error を包み、`errors.Is` で判定できるようにする。テストツールが失敗を準拠性規則（AT_PADDING の異常など）に対応付けるため。エラーメッセージは従来と同じにする（独自のエラー型が従来の文字列を返し、`Unwrap` で sentinel error を返す）。
+
+| sentinel error | 対象 |
+|---|---|
+| `ErrMalformedPacket` | EAP ヘッダ・Length・EAP-AKA ヘッダの異常、AT_MAC が複数ある（`VerifyMacRaw`） |
+| `ErrMalformedAttribute` | 属性ヘッダの途中で終わる、Length が 0、Length がデータを超える、値を解析できない |
+| `ErrBiddingInAKAPrime` | EAP-AKA' の AT_BIDDING（`Parse`・`Marshal`） |
+| `ErrEncrDataLength` | AT_ENCR_DATA が 16 バイトの正の倍数でない |
+| `ErrPaddingLength` / `ErrPaddingNotZero` / `ErrPaddingNotLast` | AT_PADDING の長さ・ゼロ埋め・位置 |
+| `ErrMacNotFound` | AT_MAC がない |
+| `ErrEmptyKdfInput` | AT_KDF_INPUT が空（`Parse`、`AtKdfInput`、`DeriveCKPrimeIKPrime`） |
+| `ErrMalformedMPPEKey` | MS-MPPE 鍵の属性の長さや Key-Length の異常（`DecryptMPPEKey`） |
+
+- 値を解析できない属性は `*AttributeError{Type, Err}` で報告する。`Unwrap() []error` で `ErrMalformedAttribute` と個別の原因の両方を返すので、`errors.Is` はどちらにも一致し、`errors.AsType[*AttributeError]` で属性タイプを取り出せる。
+- 鍵や IV の長さなど、呼び出し側の誤りによるエラーは分類しない。
 
 ## 5. テスト戦略 (Testing Strategy)
 
@@ -284,7 +307,7 @@ Round-Tripだけでは検出しにくい仕様逸脱を防ぐため、属性ご�
 
 | 生成元 | 対象 |
 |---|---|
-| hostap 2.12（`eap_sim_common.c` と内蔵の暗号実装にリンクする C プログラム） | フル認証・再認証の鍵、AT_ENCR_DATA、AT_IV・AT_ENCR_DATA・AT_MAC を含む完成したパケット（追加データ付きの MAC、AT_BIDDING を含む違反パケットを含む） |
+| hostap 2.12（`eap_sim_common.c` と内蔵の暗号実装にリンクする C プログラム） | フル認証・再認証の鍵、AT_ENCR_DATA、AT_IV・AT_ENCR_DATA・AT_MAC を含む完成したパケット（追加データ付きの MAC、AT_BIDDING を含む違反パケット、予約フィールドを 0 以外にしたパケットを含む） |
 | Python の標準ライブラリ | MPPE 鍵（hostap の `radius.c` でも照合）、AT_CHECKCODE |
 
 生成プログラムと手順は `tools/vectorgen/README.md` にある。`make -C tools/vectorgen check` で、生成し直した結果がコミット済みのベクタと一致することを確かめられる。

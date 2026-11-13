@@ -70,6 +70,15 @@ To encrypt and decrypt MS-MPPE-Keys:
 	encKey, err := eapaka.EncryptMPPEKey(keys.MSK[:32], secret, reqAuth)
 	key, err := eapaka.DecryptMPPEKey(encKey, secret, reqAuth)
 
+To verify the MAC over the bytes as received (so that non-zero reserved
+fields set by the sender do not make a valid MAC mismatch):
+
+	ok, err := eapaka.VerifyMacRaw(data, kAut, nil)
+
+Errors for malformed input wrap sentinel errors such as ErrMalformedAttribute,
+ErrPaddingNotZero and ErrBiddingInAKAPrime, which can be tested with
+errors.Is. An attribute that cannot be parsed is reported as *AttributeError.
+
 Other helpers include ComputeCheckcode (AT_CHECKCODE), NewNotification and
 AtNotification.FullCode (AT_NOTIFICATION codes), SessionIDAKA and
 SessionIDAKAPrime (Session-Id), and ParseWithOptions.
