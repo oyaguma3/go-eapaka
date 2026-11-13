@@ -7,7 +7,29 @@ import (
 )
 
 // Parse parses an EAP packet from a byte slice.
+//
+// It is equivalent to ParseWithOptions with the zero ParseOptions.
 func Parse(data []byte) (*Packet, error) {
+	return ParseWithOptions(data, ParseOptions{})
+}
+
+// ParseOptions relaxes checks that Parse applies. The zero value gives the
+// same behavior as Parse.
+type ParseOptions struct {
+	// AllowBiddingInAKAPrime accepts AT_BIDDING in EAP-AKA' packets, which
+	// RFC 9048 Section 4 does not allow ("This attribute is not included in
+	// EAP-AKA' messages"). A tester can use it to parse such a packet from the
+	// implementation under test and report the violation, instead of failing
+	// to parse the packet.
+	//
+	// Marshal still rejects AT_BIDDING in EAP-AKA' packets, so the MAC of such
+	// a packet cannot be calculated or verified with the Packet methods.
+	AllowBiddingInAKAPrime bool
+}
+
+// ParseWithOptions parses an EAP packet from a byte slice like Parse, with the
+// checks relaxed as specified by opts.
+func ParseWithOptions(data []byte, opts ParseOptions) (*Packet, error) {
 	if len(data) < 4 {
 		return nil, errors.New("packet too short")
 	}
@@ -53,7 +75,7 @@ func Parse(data []byte) (*Packet, error) {
 	// Reserved bytes at payload[2:4] are ignored
 
 	// Attributes start at payload[4]
-	attrs, err := parseAttributes(payload[4:], p.Type == TypeAKAPrime)
+	attrs, err := parseAttributes(payload[4:], p.Type == TypeAKAPrime && !opts.AllowBiddingInAKAPrime)
 	if err != nil {
 		return nil, err
 	}
