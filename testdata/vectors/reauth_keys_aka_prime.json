@@ -1,0 +1,42 @@
+{
+  "source": "hostap hostap_2_12 (831364bf02710ad09c2f27d3efa92abeeb5634c0): eap_aka_prime_derive_keys_reauth",
+  "generator": "tools/vectorgen/vectorgen.c",
+  "cases": [
+    {
+      "name": "aka_prime_reauth_counter1",
+      "identity": "8a1b2c3d4e5f6071@wlan.mnc001.mcc001.3gppnetwork.org",
+      "counter": 1,
+      "nonce_s": "000102030405060708090a0b0c0d0e0f",
+      "k_re": "cf83aa8bc7e0aced892acc98e76a9b2095b558c7795c7094715cb3393aa7d17a",
+      "msk": "44ac00a791c5dd5c352f84c9e23ed993b9280d51951d972d34583d61c251c8e440b802aae28c0214905471d7226f6ce95ee07323ea5e3fc840672054eb8091ae",
+      "emsk": "816d268a88b8c6162dfc96b8166ad461911f6a7e43217a830d747d087a30a3b8dea62a62dccdcd85cfbcf288d998d10f780a414f73f99130d7a58fa649d83fe9"
+    },
+    {
+      "name": "aka_prime_reauth_counter2",
+      "identity": "8a1b2c3d4e5f6072@wlan.mnc001.mcc001.3gppnetwork.org",
+      "counter": 2,
+      "nonce_s": "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+      "k_re": "cf83aa8bc7e0aced892acc98e76a9b2095b558c7795c7094715cb3393aa7d17a",
+      "msk": "def7549836aa075243a88ae72f521c9e1f8db298cd648a064b6ff23a98ea2f4c4e004d8703fb013d703a10f36185d2a14d2a64eb2f1ac07e11b417832f8e5110",
+      "emsk": "6f23fe3084119c1097c2dcb56964a49eb2c90c205da0911a7d0c05afaef8cc53d0d22f556998a52079163f2e57ca41106ce047dfd4a1a431fb91aabd2e36a049"
+    },
+    {
+      "name": "aka_prime_reauth_counter_max",
+      "identity": "r",
+      "counter": 65535,
+      "nonce_s": "0123456789abcdef0123456789abcdef",
+      "k_re": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+      "msk": "e3cf8e6147af757b48374bda81a51839009338d7f6b13d0e67ed1249e2ae3cce993ad63a9d11a0b609f1401e55cfbd1cd83da3baf94acc2618442f9a9c76dcce",
+      "emsk": "0c584baee69365ef1dac65acfd02267355ddf1cee79ea728e9c0979e6e38488effd4e66fe0a8ac3efe045734bc0cbfacdf59262fe3ad55bd3857bdd396a8e843"
+    },
+    {
+      "name": "aka_prime_reauth_long_identity",
+      "identity": "40000000000000000000000000000000000000000000000000000000000000000000000000000001@wlan.mnc001.mcc001.3gppnetwork.org",
+      "counter": 256,
+      "nonce_s": "deadbeefdeadbeefdeadbeefdeadbeef",
+      "k_re": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "msk": "439c5f827cd3d62484971bf9c3aef1267c93041646bc6a43501c01d2370425d106587e8785619316d38c28c625ca2f2b8e8761e0916c4ef6dc7f5b91bbb6b535",
+      "emsk": "738d7251acfb1898d5dfcd01acc786b841f85d0f0d807628f285b0dcb83b94edd743dee3c4cd1135789c088550535406528d2e3778bd25748eb7a61d50038e46"
+    }
+  ]
+}

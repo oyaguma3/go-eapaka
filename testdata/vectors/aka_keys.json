@@ -1,0 +1,61 @@
+{
+  "source": "hostap hostap_2_12 (831364bf02710ad09c2f27d3efa92abeeb5634c0): eap_aka_derive_mk, eap_sim_derive_keys",
+  "generator": "tools/vectorgen/vectorgen.c",
+  "cases": [
+    {
+      "name": "aka_full_1",
+      "identity": "0555444333222111",
+      "ik": "9744871ad32bf9bbd1dd5ce54e3e2e5a",
+      "ck": "5349fbe098649f948f5d2e973a81c00f",
+      "mk": "f5f57b91e7e9f17d5a78386d40c2cead45a160bb",
+      "k_encr": "18e8b20bcda70486fd5959586a9e7c3d",
+      "k_aut": "18c044070e5e642a2643876ff7a83812",
+      "msk": "352ffaef2df120cb22410b9c0b70623cb5a35bc9fcd6bca0fc337b48b17630890a03375cfd1e64cbd6bf8304374dd2e139d64ed1a6d618ffefb08c26a6bb3585",
+      "emsk": "9e0659ae03977dcbb1d64d2405e11082a91adb9ac7f7bd0b74a61ec0e980b36fa0c3988b6e11ef12528e3804b32df1bc52f6249fa96dc94c94a3d9b148f4f996"
+    },
+    {
+      "name": "aka_full_nai",
+      "identity": "0123456789012345@wlan.mnc001.mcc001.3gppnetwork.org",
+      "ik": "000102030405060708090a0b0c0d0e0f",
+      "ck": "101112131415161718191a1b1c1d1e1f",
+      "mk": "7d6dcde4a4a0c3b8914cea846b09c32a88cebd59",
+      "k_encr": "f0e4a7385d5c66f0780aaca2d9656aed",
+      "k_aut": "f4665aa54fcfc8b7b7b441986f079b5d",
+      "msk": "5cd0eeb18a0752c1b29724a95852bbc55870499bfa79f4d99ab52bfb4187f17f837a6459029304eefe0bbdbab7f5be6c372d1393a9065a73af9fbfbc53c1ecb3",
+      "emsk": "925f0c76b73f11506a887091d93e6af409213dc3b64536a9af9bbf5ae760b846d1dce21ee3cc1bac625ced654f7a9628b446db652beafee5f7dd7dc9aa68477c"
+    },
+    {
+      "name": "aka_full_zero_keys",
+      "identity": "test_identity",
+      "ik": "00000000000000000000000000000000",
+      "ck": "00000000000000000000000000000000",
+      "mk": "397e3f73f188dfc170df2e21b101aa05082f098e",
+      "k_encr": "501777a46df62c9050853af006ee0da7",
+      "k_aut": "9b5dd921fa5239fe438e8f5456f8a2e8",
+      "msk": "5a316e9048ab0ccfd08ff3cfe018bbf3f3ee1962d87f19e53d5bc9526197d03d465c1007619fbc890e29832b44cb4985304a87cfc3e82f5061fc75f5be81b89a",
+      "emsk": "a003d00005fdcc69e406bd4a4a54d5a73278923fff00e81df6aff57dce443e38608bd7d91327c4a6a353532264ad4c8ec7a58604c389422e715f3b1d4da664f5"
+    },
+    {
+      "name": "aka_full_pseudonym",
+      "identity": "2s7ah6n9q3fc8w4x",
+      "ik": "ffeeddccbbaa99887766554433221100",
+      "ck": "f0e1d2c3b4a5968778695a4b3c2d1e0f",
+      "mk": "f3200c0fcaa6959656d5ff511a6a62424d220147",
+      "k_encr": "5863daebf70edce46f94ed01d2b5a479",
+      "k_aut": "cebf9af073e39091d58dcc1e17ef0c81",
+      "msk": "f5de82f8a5f0c97d8506fd2003dd3fd2a79597fb2d76cf945f143f07a9076b4e2898c06f2d07da8852229060649810f1220db096663adb232cccf7643d3798a5",
+      "emsk": "887906a50fdb5e2701c1739fb359cad53fabda041d90fd64ba06aaec2f2d4db01cf0ffd55c2ac550b04e8f5328d44b0d8a52611bc82476915bb57f62f7c6b674"
+    },
+    {
+      "name": "aka_full_long_identity",
+      "identity": "40000000000000000000000000000000000000000000000000000000000000000000000000000001@wlan.mnc001.mcc001.3gppnetwork.org",
+      "ik": "a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5",
+      "ck": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+      "mk": "c66bc290d7ae9e6bbc9ff7797b66ec9927784b39",
+      "k_encr": "c1a1f62a71b8616ad9b0ce66540cbbc2",
+      "k_aut": "26237ff3512b5e9cbb560eaa3bcd333d",
+      "msk": "7a4e5c13173b6a79d4febf35dbeba12c6d88eb8471cae987579c151875260f05834d09aa64610a7ee1b9fa806b7ddf2ade1aafbdb1f9a6e2ed5dd00a65d6476a",
+      "emsk": "102aec77dce994484cae7f19625500b90e07e396ca2badd378388cb0a0adb3681bd15414c13c9b479839f36a6d811d7704670ccefdb0b31e53c3acd72ec49bfb"
+    }
+  ]
+}

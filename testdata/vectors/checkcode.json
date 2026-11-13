@@ -1,0 +1,80 @@
+{
+  "source": "Python hashlib.sha1/sha256: independent implementation of RFC 4187 Section 10.13 and RFC 9048 Section 3.4.3 (hashed data as in hostap eap_aka.c id_msgs)",
+  "generator": "tools/vectorgen/pyvectors.py",
+  "cases": [
+    {
+      "name": "aka_no_identity_exchange",
+      "method": "aka",
+      "packets": [],
+      "checkcode": ""
+    },
+    {
+      "name": "aka_any_id_pseudonym",
+      "method": "aka",
+      "packets": [
+        "0101000c170500000d010000",
+        "0201003c170500000e0d002e3273376168366e3971336640776c616e2e6d6e633030312e6d63633030312e336770706e6574776f726b2e6f72670000"
+      ],
+      "checkcode": "461147847249efd0dea6f7927ec75b3a40a02857"
+    },
+    {
+      "name": "aka_fullauth_id_permanent",
+      "method": "aka",
+      "packets": [
+        "0107000c1705000011010000",
+        "02070040170500000e0e00333035353534343433333332323231313140776c616e2e6d6e633030312e6d63633030312e336770706e6574776f726b2e6f726700"
+      ],
+      "checkcode": "607b50584007b2e6555a04f2d00a40a86ae728d8"
+    },
+    {
+      "name": "aka_three_rounds",
+      "method": "aka",
+      "packets": [
+        "0101000c170500000d010000",
+        "02010038170500000e0c002c34726561757468303140776c616e2e6d6e633030312e6d63633030312e336770706e6574776f726b2e6f7267",
+        "0102000c1705000011010000",
+        "0202003c170500000e0d002f3273376168366e397133666340776c616e2e6d6e633030312e6d63633030312e336770706e6574776f726b2e6f726700",
+        "0103000c170500000a010000",
+        "02030040170500000e0e00333035353534343433333332323231313140776c616e2e6d6e633030312e6d63633030312e336770706e6574776f726b2e6f726700"
+      ],
+      "checkcode": "ed1d0f6ef9343f5c865cc34932494ad10bcaf401"
+    },
+    {
+      "name": "aka_prime_no_identity_exchange",
+      "method": "aka_prime",
+      "packets": [],
+      "checkcode": ""
+    },
+    {
+      "name": "aka_prime_any_id_pseudonym",
+      "method": "aka_prime",
+      "packets": [
+        "0101000c320500000d010000",
+        "0201003c320500000e0d002e3273376168366e3971336640776c616e2e6d6e633030312e6d63633030312e336770706e6574776f726b2e6f72670000"
+      ],
+      "checkcode": "65ebeec1358c9bae86fed84d37e369de615e775885b55b1562997aec753360ee"
+    },
+    {
+      "name": "aka_prime_fullauth_id_permanent",
+      "method": "aka_prime",
+      "packets": [
+        "0107000c3205000011010000",
+        "02070040320500000e0e00333635353534343433333332323231313140776c616e2e6d6e633030312e6d63633030312e336770706e6574776f726b2e6f726700"
+      ],
+      "checkcode": "7881899fcaf9d0eeff6eae79992aa882ee8e7ea3641a78f408ff61a058faf0db"
+    },
+    {
+      "name": "aka_prime_three_rounds",
+      "method": "aka_prime",
+      "packets": [
+        "0101000c320500000d010000",
+        "02010038320500000e0c002c38726561757468303140776c616e2e6d6e633030312e6d63633030312e336770706e6574776f726b2e6f7267",
+        "0102000c3205000011010000",
+        "0202003c320500000e0d002f3273376168366e397133666340776c616e2e6d6e633030312e6d63633030312e336770706e6574776f726b2e6f726700",
+        "0103000c320500000a010000",
+        "02030040320500000e0e00333635353534343433333332323231313140776c616e2e6d6e633030312e6d63633030312e336770706e6574776f726b2e6f726700"
+      ],
+      "checkcode": "d9cf7ee4379efc506f3a28b05711f3c3e14ee73f10eacc3eaa3c5fc420b4c949"
+    }
+  ]
+}
