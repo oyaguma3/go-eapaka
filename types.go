@@ -11,7 +11,7 @@ const (
 // EAP Method Types
 const (
 	TypeAKA      uint8 = 23 // RFC 4187
-	TypeAKAPrime uint8 = 50 // RFC 5448
+	TypeAKAPrime uint8 = 50 // RFC 9048
 )
 
 // EAP-AKA Subtypes (RFC 4187 Section 11)

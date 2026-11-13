@@ -149,7 +149,7 @@ func TestDeriveKeysAKA(t *testing.T) {
 	})
 }
 
-func TestDeriveKeysAKAPrime_RFC5448_Case1(t *testing.T) {
+func TestDeriveKeysAKAPrime_RFC9048_Case1(t *testing.T) {
 	// RFC 9048 Appendix D Case 1
 	identity := "0555444333222111"
 	netName := "WLAN"
