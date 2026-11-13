@@ -1,0 +1,39 @@
+{
+  "source": "hostap hostap_2_12 (831364bf02710ad09c2f27d3efa92abeeb5634c0): eap_sim_msg_*, aes_128_cbc_encrypt, eap_sim_add_mac, eap_sim_add_mac_sha256, eap_sim_verify_mac, eap_sim_verify_mac_sha256, eap_sim_parse_encr; Reserved fields of AT_RAND, AT_AUTN, AT_RESULT_IND, AT_IV and AT_ENCR_DATA set to non-zero values on purpose",
+  "generator": "tools/vectorgen/vectorgen.c",
+  "cases": [
+    {
+      "name": "aka_challenge_reserved_nonzero",
+      "method": "aka",
+      "k_encr": "18e8b20bcda70486fd5959586a9e7c3d",
+      "k_aut": "18c044070e5e642a2643876ff7a83812",
+      "iv": "",
+      "plaintext": "",
+      "extra": "",
+      "mac": "7e98eadfdd4cded73238a1fdeca3e526",
+      "packet": "016000481701000001050102101112131415161718191a1b1c1d1e1f02050304202122232425262728292a2b2c2d2e2f870105060b0500007e98eadfdd4cded73238a1fdeca3e526"
+    },
+    {
+      "name": "aka_reauth_request_reserved_nonzero",
+      "method": "aka",
+      "k_encr": "18e8b20bcda70486fd5959586a9e7c3d",
+      "k_aut": "18c044070e5e642a2643876ff7a83812",
+      "iv": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "plaintext": "13010001150500000f0e0d0c0b0a090807060504030201000602000000000000",
+      "extra": "",
+      "mac": "7f6b14973412390bdca917f29b5461be",
+      "packet": "01610054170d000081051111bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb82092222512aabb0674a6f747b67185cae5e2426d6fcc8febfdca921e163a10016eec85e0b0500007f6b14973412390bdca917f29b5461be"
+    },
+    {
+      "name": "aka_prime_reauth_response_reserved_nonzero",
+      "method": "aka_prime",
+      "k_encr": "766fa0a6c317174b812d52fbcd11a179",
+      "k_aut": "0842ea722ff6835bfa2032499fc3ec23c2f0e388b4f07543ffc677f1696d71ea",
+      "iv": "cccccccccccccccccccccccccccccccc",
+      "plaintext": "13010001060300000000000000000000",
+      "extra": "0f0e0d0c0b0a09080706050403020100",
+      "mac": "582bc4518a9edc4251559aff7e3862a3",
+      "packet": "02620044320d000081053333cccccccccccccccccccccccccccccccc8205444496c02af74cc199eb0ba73eaf62a81b1c0b050000582bc4518a9edc4251559aff7e3862a3"
+    }
+  ]
+}

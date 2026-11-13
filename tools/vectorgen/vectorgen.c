@@ -15,6 +15,7 @@
 
 #include "common.h"
 #include "wpabuf.h"
+#include "crypto/aes_wrap.h"
 #include "crypto/crypto.h"
 #include "crypto/random.h"
 #include "crypto/sha1.h"
@@ -999,6 +1000,163 @@ static void gen_packets(const char *dir, const char *file,
 	jw_close(&w);
 }
 
+/* -------------------------------------------------------------------------
+ * packets_reserved_nonzero.json: 予約フィールドを 0 以外にしたパケット
+ *
+ * RFC 4187 では予約フィールドは「送信時は 0、受信時は無視」。受信したバイト列の
+ * まま MAC を検証する API（go-eapaka の VerifyMacRaw）のテストのために、
+ * AT_RAND・AT_AUTN・AT_RESULT_IND・AT_IV・AT_ENCR_DATA の Reserved を意図的に
+ * 0 以外にしたパケットを作る。eap_sim_msg_add() の value 引数が Reserved になる。
+ * MAC は hostap が送受信したままのバイト列（AT_MAC の MAC 部分だけを 0 にしたもの）
+ * に対して計算する。AT_MAC 自身の Reserved は 0 のまま。
+ * ------------------------------------------------------------------------- */
+
+enum reserved_kind {
+	RSV_AKA_CHALLENGE,	   /* AT_RAND・AT_AUTN・AT_RESULT_IND */
+	RSV_AKA_REAUTH_REQUEST,	   /* AT_IV・AT_ENCR_DATA（SHA-1） */
+	RSV_AKA_PRIME_REAUTH_RESPONSE, /* AT_IV・AT_ENCR_DATA、NONCE_S 付き（SHA-256） */
+};
+
+struct reserved_input {
+	const char *name;
+	int method;
+	enum reserved_kind kind;
+	const char *iv; /* AT_ENCR_DATA を使わないなら NULL */
+};
+
+static const struct reserved_input reserved_inputs[] = {
+	{ "aka_challenge_reserved_nonzero", EAP_TYPE_AKA, RSV_AKA_CHALLENGE,
+	  NULL },
+	{ "aka_reauth_request_reserved_nonzero", EAP_TYPE_AKA,
+	  RSV_AKA_REAUTH_REQUEST, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+	{ "aka_prime_reauth_response_reserved_nonzero", EAP_TYPE_AKA_PRIME,
+	  RSV_AKA_PRIME_REAUTH_RESPONSE, "cccccccccccccccccccccccccccccccc" },
+};
+
+static void gen_reserved_nonzero(const char *dir)
+{
+	struct jw w;
+	size_t i;
+	u8 nonce_s[EAP_SIM_NONCE_S_LEN];
+	u8 rand[EAP_AKA_RAND_LEN], autn[EAP_AKA_AUTN_LEN];
+
+	unhex(nonce_s_hex, nonce_s, sizeof(nonce_s));
+	unhex(pkt_rand, rand, sizeof(rand));
+	unhex(pkt_autn, autn, sizeof(autn));
+
+	jw_open(&w, dir, "packets_reserved_nonzero.json",
+		"hostap " HOSTAP_DESC ": eap_sim_msg_*, aes_128_cbc_encrypt, "
+		"eap_sim_add_mac, eap_sim_add_mac_sha256, eap_sim_verify_mac, "
+		"eap_sim_verify_mac_sha256, eap_sim_parse_encr; Reserved fields "
+		"of AT_RAND, AT_AUTN, AT_RESULT_IND, AT_IV and AT_ENCR_DATA set "
+		"to non-zero values on purpose");
+	for (i = 0; i < ARRAY_SIZE(reserved_inputs); i++) {
+		const struct reserved_input *in = &reserved_inputs[i];
+		int prime = in->method == EAP_TYPE_AKA_PRIME;
+		const u8 *k_encr = prime ? akap1_k_encr : aka1_k_encr;
+		const u8 *k_aut = prime ? akap1_k_aut : aka1_k_aut;
+		size_t k_aut_len = prime ? EAP_AKA_PRIME_K_AUT_LEN :
+			EAP_SIM_K_AUT_LEN;
+		const u8 *extra = NULL;
+		size_t extra_len = 0;
+		struct eap_sim_msg *msg;
+		struct wpabuf *buf;
+		struct eap_sim_attrs attr;
+		u8 iv[EAP_SIM_IV_LEN], plain[32], *dec = NULL;
+		size_t plain_len = 0;
+
+		switch (in->kind) {
+		case RSV_AKA_CHALLENGE:
+			msg = eap_sim_msg_init(EAP_CODE_REQUEST, 0x60 + (int) i,
+					       in->method,
+					       EAP_AKA_SUBTYPE_CHALLENGE);
+			eap_sim_msg_add(msg, EAP_SIM_AT_RAND, 0x0102, rand,
+					sizeof(rand));
+			eap_sim_msg_add(msg, EAP_SIM_AT_AUTN, 0x0304, autn,
+					sizeof(autn));
+			eap_sim_msg_add(msg, EAP_SIM_AT_RESULT_IND, 0x0506,
+					NULL, 0);
+			break;
+		case RSV_AKA_REAUTH_REQUEST:
+			msg = eap_sim_msg_init(EAP_CODE_REQUEST, 0x60 + (int) i,
+					       in->method,
+					       EAP_AKA_SUBTYPE_REAUTHENTICATION);
+			/* AT_COUNTER(1) | AT_NONCE_S | AT_PADDING(8 バイト) */
+			os_memcpy(plain, "\x13\x01\x00\x01\x15\x05\x00\x00", 8);
+			os_memcpy(plain + 8, nonce_s, sizeof(nonce_s));
+			os_memcpy(plain + 24, "\x06\x02\x00\x00\x00\x00\x00\x00",
+				  8);
+			plain_len = 32;
+			break;
+		case RSV_AKA_PRIME_REAUTH_RESPONSE:
+		default:
+			msg = eap_sim_msg_init(EAP_CODE_RESPONSE, 0x60 + (int) i,
+					       in->method,
+					       EAP_AKA_SUBTYPE_REAUTHENTICATION);
+			/* AT_COUNTER(1) | AT_PADDING(12 バイト) */
+			os_memset(plain, 0, 16);
+			os_memcpy(plain, "\x13\x01\x00\x01\x06\x03", 6);
+			plain_len = 16;
+			/* RFC 4187 §9.8: MAC は EAP パケット | NONCE_S に対して計算する */
+			extra = nonce_s;
+			extra_len = sizeof(nonce_s);
+			break;
+		}
+
+		if (in->iv) {
+			u8 ct[sizeof(plain)];
+
+			/*
+			 * eap_sim_msg_add_encr_start() は Reserved を 0 にするので、
+			 * AT_IV と AT_ENCR_DATA は自分で暗号化して追加する。
+			 */
+			unhex(in->iv, iv, sizeof(iv));
+			os_memcpy(ct, plain, plain_len);
+			if (aes_128_cbc_encrypt(k_encr, iv, ct, plain_len) < 0)
+				die("aes_128_cbc_encrypt failed");
+			eap_sim_msg_add(msg, EAP_SIM_AT_IV, prime ? 0x3333 : 0x1111,
+					iv, sizeof(iv));
+			eap_sim_msg_add(msg, EAP_SIM_AT_ENCR_DATA,
+					prime ? 0x4444 : 0x2222, ct, plain_len);
+		}
+
+		eap_sim_msg_add_mac(msg, EAP_SIM_AT_MAC);
+		buf = eap_sim_msg_finish(msg, in->method, k_aut, extra,
+					 extra_len);
+		if (!buf)
+			die("eap_sim_msg_finish failed");
+
+		/* hostap 自身で検証してから書き出す */
+		parse_packet(buf, in->method, &attr);
+		if (!attr.mac)
+			die("AT_MAC missing");
+		if (verify_mac(in->method, k_aut, buf, attr.mac, extra,
+			       extra_len) != 0)
+			die("%s: MAC verification failed", in->name);
+		if (in->iv) {
+			dec = decrypt_encr(in->method, k_encr, &attr);
+			if (attr.encr_data_len != plain_len ||
+			    os_memcmp(dec, plain, plain_len) != 0)
+				die("%s: decrypted data mismatch", in->name);
+		}
+
+		jw_case_begin(&w, in->name);
+		jw_str(&w, "method", prime ? "aka_prime" : "aka");
+		jw_hex(&w, "k_encr", k_encr, EAP_SIM_K_ENCR_LEN);
+		jw_hex(&w, "k_aut", k_aut, k_aut_len);
+		jw_hex(&w, "iv", in->iv ? iv : NULL, in->iv ? sizeof(iv) : 0);
+		jw_hex(&w, "plaintext", plain, plain_len);
+		jw_hex(&w, "extra", extra, extra_len);
+		jw_hex(&w, "mac", attr.mac, EAP_SIM_MAC_LEN);
+		jw_hex(&w, "packet", wpabuf_head_u8(buf), wpabuf_len(buf));
+		jw_case_end(&w);
+
+		os_free(dec);
+		wpabuf_free(buf);
+	}
+	jw_close(&w);
+}
+
 int main(int argc, char *argv[])
 {
 	if (argc != 2) {
@@ -1027,6 +1185,7 @@ int main(int argc, char *argv[])
 		    "does not allow, built on purpose",
 		    bidding_violation_inputs,
 		    ARRAY_SIZE(bidding_violation_inputs));
+	gen_reserved_nonzero(argv[1]);
 
 	return 0;
 }
