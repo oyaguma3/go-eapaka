@@ -641,27 +641,28 @@ enum encr_kind {
 	ENCR_PSEUDONYM,		  /* 12 バイト → パディング 4 */
 	ENCR_COUNTER_NONCE_REAUTH, /* 48 バイト → パディングなし */
 	ENCR_COUNTER_TOO_SMALL,	  /* 8 バイト → パディング 8 */
-	ENCR_PSEUDONYM_REAUTH,	  /* 長い値で複数ブロック */
+	ENCR_PSEUDONYM_REAUTH,	  /* 160 バイト（複数ブロック）→ パディングなし */
 };
 
 struct encr_input {
 	const char *name;
 	enum encr_kind kind;
+	size_t want_pad; /* 期待する AT_PADDING 全体のバイト数 */
 	const char *iv;
 };
 
 static const struct encr_input encr_inputs[] = {
-	{ "encr_counter_pad12", ENCR_COUNTER,
+	{ "encr_counter_pad12", ENCR_COUNTER, 12,
 	  "a0a1a2a3a4a5a6a7a8a9aaabacadaeaf" },
-	{ "encr_counter_nonce_pad8", ENCR_COUNTER_NONCE,
+	{ "encr_counter_nonce_pad8", ENCR_COUNTER_NONCE, 8,
 	  "b0b1b2b3b4b5b6b7b8b9babbbcbdbebf" },
-	{ "encr_pseudonym_pad4", ENCR_PSEUDONYM,
+	{ "encr_pseudonym_pad4", ENCR_PSEUDONYM, 4,
 	  "c0c1c2c3c4c5c6c7c8c9cacbcccdcecf" },
-	{ "encr_counter_nonce_reauth_nopad", ENCR_COUNTER_NONCE_REAUTH,
+	{ "encr_counter_nonce_reauth_nopad", ENCR_COUNTER_NONCE_REAUTH, 0,
 	  "d0d1d2d3d4d5d6d7d8d9dadbdcdddedf" },
-	{ "encr_counter_too_small_pad8", ENCR_COUNTER_TOO_SMALL,
+	{ "encr_counter_too_small_pad8", ENCR_COUNTER_TOO_SMALL, 8,
 	  "e0e1e2e3e4e5e6e7e8e9eaebecedeeef" },
-	{ "encr_pseudonym_reauth_multiblock", ENCR_PSEUDONYM_REAUTH,
+	{ "encr_pseudonym_reauth_multiblock", ENCR_PSEUDONYM_REAUTH, 0,
 	  "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff" },
 };
 
@@ -709,8 +710,9 @@ static void gen_encr_data(const char *dir)
 		case ENCR_COUNTER_NONCE_REAUTH:
 			add_counter(msg, 2);
 			add_nonce_s(msg, nonce_s);
+			/* 17 文字: 4 + 17 = 21 → 24 バイト。合計 4 + 20 + 24 = 48 */
 			add_id_attr(msg, EAP_SIM_AT_NEXT_REAUTH_ID,
-				    "4reauth1@example");
+				    "4reauth01@example");
 			break;
 		case ENCR_COUNTER_TOO_SMALL:
 			add_counter(msg, 3);
@@ -738,8 +740,9 @@ static void gen_encr_data(const char *dir)
 			die("AT_IV mismatch");
 		plain = decrypt_encr(EAP_TYPE_AKA, k_encr, &attr);
 		pad = padding_len(plain, attr.encr_data_len);
-		if (pad % 4 != 0 || pad > 12)
-			die("unexpected padding length %zu", pad);
+		if (pad != in->want_pad)
+			die("%s: padding length %zu, want %zu", in->name, pad,
+			    in->want_pad);
 		seen_pad[pad / 4] = 1;
 
 		jw_case_begin(&w, in->name);
