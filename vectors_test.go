@@ -336,7 +336,7 @@ func TestVectors_EncrDataConsistency(t *testing.T) {
 			if len(v.Attributes)+v.PaddingLen != len(v.Plaintext) || !bytes.HasPrefix(v.Plaintext, v.Attributes) {
 				t.Fatalf("attributes (%d bytes) + padding (%d) do not form the plaintext", len(v.Attributes), v.PaddingLen)
 			}
-			attrs, err := parseAttributeList(v.Plaintext)
+			attrs, err := ParseAttributes(v.Plaintext)
 			if err != nil {
 				t.Fatalf("parse plaintext: %v", err)
 			}
@@ -401,19 +401,4 @@ func TestVectors_CheckcodeConsistency(t *testing.T) {
 			}
 		})
 	}
-}
-
-// parseAttributeList は属性の並びを解析する（ベクタの整合性確認用）。
-// P0-2 で公開の ParseAttributes を追加したら、そちらに置き換える。
-func parseAttributeList(b []byte) ([]Attribute, error) {
-	// 既存の Parse を使うため、EAP-AKA の Request として包む
-	pkt := make([]byte, 0, 8+len(b))
-	pkt = append(pkt, CodeRequest, 0, 0, 0, TypeAKA, SubtypeReauthentication, 0, 0)
-	pkt = append(pkt, b...)
-	pkt[2], pkt[3] = byte(len(pkt)>>8), byte(len(pkt))
-	p, err := Parse(pkt)
-	if err != nil {
-		return nil, err
-	}
-	return p.Attributes, nil
 }
