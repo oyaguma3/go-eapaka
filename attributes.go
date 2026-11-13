@@ -464,6 +464,18 @@ func (a *AtNonceMt) Unmarshal(data []byte) error {
 }
 
 // AT_NOTIFICATION (RFC 4187 Section 10.19)
+//
+// S is the Success bit (0x8000 of the notification code): if it is zero, the
+// notification implies failure. P is the Phase bit (0x4000): if it is zero,
+// the notification is used only after a successful EAP/AKA-Challenge or
+// EAP/AKA-Reauthentication round; if it is one, only before that round, and S
+// must then be zero (RFC 4187 Section 6.1). Section 11 of RFC 4187 describes
+// the P bit the other way round, but Sections 6.1 and 10.19 and the assigned
+// codes (for example, 0 "General failure after authentication" has P = 0)
+// follow the definition above.
+//
+// Code holds only the lower 14 bits. Use FullCode and NewNotification to
+// convert from and to 16-bit code values such as NotificationSuccess.
 type AtNotification struct {
 	S    bool
 	P    bool
@@ -473,15 +485,8 @@ type AtNotification struct {
 func (a *AtNotification) Type() AttributeType { return AT_NOTIFICATION }
 func (a *AtNotification) Marshal() ([]byte, error) {
 	// RFC 4187: 2 bytes code. S bit is MSB (0x8000), P bit is 2nd MSB (0x4000)
-	val := a.Code & 0x3FFF
-	if a.S {
-		val |= 0x8000
-	}
-	if a.P {
-		val |= 0x4000
-	}
 	buf := make([]byte, 2)
-	binary.BigEndian.PutUint16(buf, val)
+	binary.BigEndian.PutUint16(buf, a.FullCode())
 	return marshalAttribute(AT_NOTIFICATION, buf)
 }
 func (a *AtNotification) Unmarshal(data []byte) error {

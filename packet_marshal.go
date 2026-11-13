@@ -7,7 +7,16 @@ import (
 )
 
 // Marshal serializes the EAP packet into a byte slice.
+//
+// Marshal rejects AT_BIDDING in EAP-AKA' packets (RFC 9048 Section 4).
 func (p *Packet) Marshal() ([]byte, error) {
+	return p.marshal(true)
+}
+
+// marshal はパケットをバイト列にする。rejectBidding が true なら EAP-AKA' の
+// AT_BIDDING をエラーにする。MAC の計算・検証では、ParseWithOptions で読み込んだ
+// 違反パケットも扱えるよう false で呼ぶ。
+func (p *Packet) marshal(rejectBidding bool) ([]byte, error) {
 	var buf bytes.Buffer
 
 	// 1. Marshal Attributes first to calculate length
@@ -24,7 +33,7 @@ func (p *Packet) Marshal() ([]byte, error) {
 		attrsBuf.Write([]byte{0x00, 0x00}) // Reserved
 
 		for _, attr := range p.Attributes {
-			if p.Type == TypeAKAPrime && attr.Type() == AT_BIDDING {
+			if rejectBidding && p.Type == TypeAKAPrime && attr.Type() == AT_BIDDING {
 				return nil, errors.New("AT_BIDDING is only valid for EAP-AKA")
 			}
 			b, err := attr.Marshal()

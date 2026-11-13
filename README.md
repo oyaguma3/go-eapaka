@@ -1,6 +1,6 @@
 # go-eapaka
 
-`go-eapaka` is a Go library for **EAP-AKA (RFC 4187)** and **EAP-AKA' (RFC 5448)** protocols.
+`go-eapaka` is a Go library for **EAP-AKA (RFC 4187)** and **EAP-AKA' (RFC 9048, which obsoletes RFC 5448)** protocols.
 It provides robust functionality for **marshaling (generating)** and **unmarshaling (parsing)** EAP packets, designed for building RADIUS servers, EAP peers, and testing tools.
 
 ## Features
@@ -100,7 +100,7 @@ pkt := &eapaka.Packet{
 
 ### Key Derivation (KDF)
 
-Derive session keys for EAP-AKA (RFC 4187) and EAP-AKA' (RFC 5448).
+Derive session keys for EAP-AKA (RFC 4187) and EAP-AKA' (RFC 9048).
 
 ```go
 // EAP-AKA' Example
@@ -121,9 +121,60 @@ fmt.Printf("MSK: %x\n", keys.MSK)
 
 **Note on EAP-AKA' KDF**: `DeriveCKPrimeIKPrime` follows TS 33.402 Annex A.2 and matches RFC 9048 Appendix D test vectors. See `kdf_test.go` for details.
 
+### Fast Re-authentication
+
+Keep `MK` (EAP-AKA) or `K_re` (EAP-AKA') from full authentication, and derive a new MSK and EMSK on each fast re-authentication (RFC 4187 Section 7, RFC 9048 Section 3.3). `K_encr` and `K_aut` from full authentication stay in use.
+
+```go
+// EAP-AKA
+full := eapaka.DeriveKeysAKA(identity, ck, ik)
+reauth, err := eapaka.DeriveReauthKeysAKA(reauthID, counter, nonceS, full.MK)
+
+// EAP-AKA'
+fullPrime := eapaka.DeriveKeysAKAPrime(identity, ckPrime, ikPrime)
+reauthPrime, err := eapaka.DeriveReauthKeysAKAPrime(reauthID, counter, nonceS, fullPrime.K_re)
+```
+
+`reauthID` is the fast re-authentication identity without terminating null characters, `counter` is the `AT_COUNTER` value, and `nonceS` is the 16-byte `AT_NONCE_S` value.
+
+#### Encrypted Attributes (AT_ENCR_DATA)
+
+`EncryptAttributes` appends `AT_PADDING` as needed and encrypts the attributes with AES-128-CBC. `DecryptAttributes` checks that `AT_PADDING` is last and zero-filled, and removes it (RFC 4187 Section 10.12). Use a new IV for every `AT_ENCR_DATA`.
+
+```go
+iv := eapaka.NewIV()
+encrypted, err := eapaka.EncryptAttributes(full.K_encr, iv, []eapaka.Attribute{
+	&eapaka.AtCounter{Counter: 1},
+	&eapaka.AtNonceS{NonceS: nonceS},
+	&eapaka.AtNextReauthId{Identity: nextReauthID},
+})
+attrs := []eapaka.Attribute{
+	&eapaka.AtIv{IV: iv},
+	&eapaka.AtEncrData{EncryptedData: encrypted},
+	&eapaka.AtMac{},
+}
+
+// Receiving side (after verifying AT_MAC)
+nested, err := eapaka.DecryptAttributes(full.K_encr, iv, encrypted)
+```
+
+`ParseAttributes` parses a bare sequence of attributes. Unknown attributes are returned as `*GenericAttribute`; `IsSkippable` tells whether such an attribute may be ignored (RFC 4187 Section 8.1).
+
+#### MAC with NONCE_S
+
+The MAC of EAP-Response/AKA-Reauthentication covers the packet followed by `NONCE_S` (RFC 4187 Section 9.8). Other messages use `CalculateAndSetMac` and `VerifyMac`.
+
+```go
+// Peer
+err := resp.CalculateAndSetMacWithExtra(full.K_aut, nonceS)
+
+// Server
+ok, err := resp.VerifyMacWithExtra(full.K_aut, nonceS)
+```
+
 ### MS-MPPE-Key Encryption
 
-Encrypt the `MS-MPPE-Send-Key` and `MS-MPPE-Recv-Key` attributes for RADIUS.
+Encrypt and decrypt the `MS-MPPE-Send-Key` and `MS-MPPE-Recv-Key` attributes for RADIUS (RFC 2548).
 
 ```go
 // Split MSK into Send/Recv keys
@@ -136,6 +187,49 @@ reqAuth := ... // 16 bytes from RADIUS Access-Request
 
 encSendKey, _ := eapaka.EncryptMPPEKey(sendKey, secret, reqAuth)
 encRecvKey, _ := eapaka.EncryptMPPEKey(recvKey, secret, reqAuth)
+
+// RADIUS client side: decrypt the attribute value (Salt + encrypted String)
+decrypted, err := eapaka.DecryptMPPEKey(encRecvKey, secret, reqAuth)
+```
+
+`DecryptMPPEKey` does not check the Salt. Check that its most significant bit is set (`enc[0]&0x80 != 0`) and that it is unique within the Access-Accept yourself.
+
+### AT_CHECKCODE
+
+`ComputeCheckcode` hashes the EAP-Request/AKA-Identity and EAP-Response/AKA-Identity packets as transmitted, in order, with SHA-1 (EAP-AKA) or SHA-256 (EAP-AKA') (RFC 4187 Section 10.13, RFC 9048 Section 3.4.3). With no packets, it returns an empty checkcode.
+
+```go
+checkcode, err := eapaka.ComputeCheckcode(eapaka.TypeAKA, req1, resp1, req2, resp2)
+attr := &eapaka.AtCheckcode{Checkcode: checkcode}
+```
+
+### Notification Codes
+
+`AtNotification.Code` holds only the lower 14 bits. Use `NewNotification` and `FullCode` with the 16-bit codes of RFC 4187 Section 10.19, which include the S bit (0x8000) and the P bit (0x4000).
+
+```go
+attr := eapaka.NewNotification(eapaka.NotificationGeneralFailure) // S = 0, P = 1
+
+if received.FullCode() == eapaka.NotificationSuccess {
+	// ...
+}
+```
+
+Constants: `NotificationGeneralFailureAfterAuth` (0), `NotificationTemporarilyDenied` (1026), `NotificationNotSubscribed` (1031), `NotificationGeneralFailure` (16384), `NotificationSuccess` (32768).
+
+### Exported Parameters (Session-Id)
+
+- `SessionIDAKA(rand, autn)`: EAP-AKA, `0x17 || RAND || AUTN` (RFC 5247 Appendix A)
+- `SessionIDAKAPrime(rand, autn)` and `SessionIDAKAPrimeReauth(nonceS, mac)`: EAP-AKA' (RFC 9048 Section 6)
+- `PeerIDFromAttributes` and `ServerIDAKAPrime`
+
+### Parsing Options
+
+`Parse` rejects `AT_BIDDING` in EAP-AKA' packets (RFC 9048 Section 4). A tester can accept such a packet to report the violation:
+
+```go
+pkt, err := eapaka.ParseWithOptions(data, eapaka.ParseOptions{AllowBiddingInAKAPrime: true})
+ok, err := pkt.VerifyMac(kAut) // The MAC methods accept AT_BIDDING; Marshal still rejects it.
 ```
 
 ## Supported Attributes
@@ -149,6 +243,25 @@ encRecvKey, _ := eapaka.EncryptMPPEKey(recvKey, secret, reqAuth)
 - **Encryption**: `AT_IV`, `AT_ENCR_DATA`, `AT_PADDING`
 - **EAP-AKA' Extensions**: `AT_KDF`, `AT_KDF_INPUT`, `AT_BIDDING` (flags: `AtBiddingFlagAKAPrime`)
 - **Others**: `AT_CHECKCODE`, `AT_RESULT_IND`, `AT_NONCE_MT`, `AT_VERSION_LIST`, `AT_SELECTED_VERSION`
+
+## Test Vectors
+
+The cryptographic helpers are tested against vectors generated from implementations independent of this library: hostap 2.12 (hostapd / wpa_supplicant) and the Python standard library. The vectors are in `testdata/vectors`. `tools/vectorgen` contains the generators and the instructions to regenerate and check them (`make -C tools/vectorgen check`).
+
+## Changes in v0.2.0
+
+Added APIs (no existing function or method was removed or changed in signature):
+
+- Fast re-authentication keys: `ReauthKeys`, `DeriveReauthKeysAKA`, `DeriveReauthKeysAKAPrime`, and `AkaKeys.MK` (a new last field)
+- AT_ENCR_DATA: `EncryptAttributes`, `DecryptAttributes`, `NewIV`, `ParseAttributes`, `IsSkippable`
+- MAC with extra data: `Packet.CalculateAndSetMacWithExtra`, `Packet.VerifyMacWithExtra`
+- `ComputeCheckcode`, `NewNotification`, `AtNotification.FullCode`, the `Notification*` constants, `SessionIDAKA`
+- `DecryptMPPEKey`, `ParseOptions`, `ParseWithOptions`
+
+Compatibility notes:
+
+- `AkaKeys` has a new field, so unkeyed composite literals of `AkaKeys` no longer compile. Keyed literals and values returned by `DeriveKeysAKA` are unaffected.
+- The MAC methods now calculate and verify the MAC of EAP-AKA' packets that contain `AT_BIDDING` instead of returning an error. `Marshal` and `Parse` still reject such packets.
 
 ## RFC Compliance Updates (2026-02-20)
 
@@ -167,9 +280,11 @@ Compatibility note:
 
 ## References
 
+- [RFC 2548: Microsoft Vendor-specific RADIUS Attributes](https://www.rfc-editor.org/rfc/rfc2548)
 - [RFC 3748: Extensible Authentication Protocol (EAP)](https://tools.ietf.org/html/rfc3748)
 - [RFC 4187: EAP Method for 3rd Generation Authentication and Key Agreement (EAP-AKA)](https://tools.ietf.org/html/rfc4187)
-- [RFC 5448: Improved EAP Method for 3rd Generation Authentication and Key Agreement (EAP-AKA')](https://tools.ietf.org/html/rfc5448)
+- [RFC 5247: Extensible Authentication Protocol (EAP) Key Management Framework](https://www.rfc-editor.org/rfc/rfc5247)
+- [RFC 9048: Improved Extensible Authentication Protocol Method for 3GPP Mobile Network Authentication and Key Agreement (EAP-AKA')](https://www.rfc-editor.org/rfc/rfc9048) (obsoletes RFC 5448)
 
 ## License
 

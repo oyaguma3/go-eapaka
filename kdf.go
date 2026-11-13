@@ -4,7 +4,9 @@ import (
 	"crypto/hmac"
 	"crypto/sha1"
 	"crypto/sha256"
+	"encoding/binary"
 	"errors"
+	"fmt"
 	"math/big"
 )
 
@@ -14,6 +16,7 @@ type AkaKeys struct {
 	K_aut  []byte // 128 bits (16 bytes)
 	MSK    []byte // 512 bits (64 bytes)
 	EMSK   []byte // 512 bits (64 bytes)
+	MK     []byte // 160 bits (20 bytes) - Master Key, input to DeriveReauthKeysAKA
 }
 
 // AkaPrimeKeys holds the key material derived for EAP-AKA' (RFC 5448).
@@ -45,6 +48,7 @@ func DeriveKeysAKA(identity string, ck, ik []byte) AkaKeys {
 		K_aut:  keyBlock[16:32],
 		MSK:    keyBlock[32:96],
 		EMSK:   keyBlock[96:160],
+		MK:     mk,
 	}
 }
 
@@ -111,6 +115,96 @@ func DeriveCKPrimeIKPrime(ck, ik []byte, netName string, autn []byte) (ckPrime, 
 	ckPrime = out[:16]
 	ikPrime = out[16:32]
 	return ckPrime, ikPrime, nil
+}
+
+// ReauthKeys holds the key material derived on fast re-authentication.
+// K_encr and K_aut are not re-derived on fast re-authentication; the keys from
+// the preceding full authentication continue to be used (RFC 4187 Section 7,
+// RFC 9048 Section 3.3).
+type ReauthKeys struct {
+	MSK  []byte // 512 bits (64 bytes)
+	EMSK []byte // 512 bits (64 bytes)
+}
+
+const (
+	nonceSLen = 16 // AT_NONCE_S
+	mkLenAKA  = 20 // EAP-AKA の MK
+	kReLen    = 32 // EAP-AKA' の K_re
+
+	// reauthLabelAKAPrime は EAP-AKA' の再認証で PRF' の seed の先頭に置く、
+	// NUL を含まない 16 文字の ASCII 文字列（RFC 9048 §3.3）。
+	reauthLabelAKAPrime = "EAP-AKA' re-auth"
+)
+
+// DeriveReauthKeysAKA derives the MSK and EMSK for EAP-AKA fast
+// re-authentication as per RFC 4187 Section 7:
+//
+//	XKEY' = SHA1(Identity|counter|NONCE_S|MK)
+//
+// XKEY' seeds the same FIPS 186-2 PRF as in full authentication, and the first
+// 128 bytes of its output become the MSK and the EMSK.
+//
+// identity is the fast re-authentication identity without terminating null
+// characters: the AT_IDENTITY value from EAP-Response/AKA-Identity, or, if that
+// message was not used, the identity from EAP-Response/Identity. counter is
+// the AT_COUNTER value used in EAP-Response/AKA-Reauthentication. nonceS is the
+// AT_NONCE_S value (16 bytes), and mk is AkaKeys.MK from the preceding full
+// authentication (20 bytes).
+func DeriveReauthKeysAKA(identity string, counter uint16, nonceS, mk []byte) (ReauthKeys, error) {
+	if len(nonceS) != nonceSLen {
+		return ReauthKeys{}, fmt.Errorf("NONCE_S must be %d bytes, got %d", nonceSLen, len(nonceS))
+	}
+	if len(mk) != mkLenAKA {
+		return ReauthKeys{}, fmt.Errorf("MK must be %d bytes, got %d", mkLenAKA, len(mk))
+	}
+
+	keyBlock := prfGenAKA(xkeyPrimeAKA(identity, counter, nonceS, mk), 128)
+	return ReauthKeys{
+		MSK:  keyBlock[0:64],
+		EMSK: keyBlock[64:128],
+	}, nil
+}
+
+// xkeyPrimeAKA は EAP-AKA の再認証の XKEY' = SHA1(Identity|counter|NONCE_S|MK) を
+// 計算する。counter はネットワークバイトオーダー（RFC 4187 §7）。
+func xkeyPrimeAKA(identity string, counter uint16, nonceS, mk []byte) []byte {
+	h := sha1.New()
+	h.Write([]byte(identity))
+	h.Write(binary.BigEndian.AppendUint16(nil, counter))
+	h.Write(nonceS)
+	h.Write(mk)
+	return h.Sum(nil)
+}
+
+// DeriveReauthKeysAKAPrime derives the MSK and EMSK for EAP-AKA' fast
+// re-authentication as per RFC 9048 Section 3.3:
+//
+//	MK   = PRF'(K_re, "EAP-AKA' re-auth"|Identity|counter|NONCE_S)
+//	MSK  = MK[0..511]
+//	EMSK = MK[512..1023]
+//
+// identity, counter and nonceS are as for DeriveReauthKeysAKA. kRe is
+// AkaPrimeKeys.K_re from the preceding full authentication (32 bytes); it stays
+// unchanged over the fast re-authentications based on that full authentication.
+func DeriveReauthKeysAKAPrime(identity string, counter uint16, nonceS, kRe []byte) (ReauthKeys, error) {
+	if len(nonceS) != nonceSLen {
+		return ReauthKeys{}, fmt.Errorf("NONCE_S must be %d bytes, got %d", nonceSLen, len(nonceS))
+	}
+	if len(kRe) != kReLen {
+		return ReauthKeys{}, fmt.Errorf("K_re must be %d bytes, got %d", kReLen, len(kRe))
+	}
+
+	seed := make([]byte, 0, len(reauthLabelAKAPrime)+len(identity)+2+nonceSLen)
+	seed = append(seed, reauthLabelAKAPrime...)
+	seed = append(seed, identity...)
+	seed = binary.BigEndian.AppendUint16(seed, counter)
+	seed = append(seed, nonceS...)
+
+	keyBlock := prfPlusIKEv2(kRe, seed, 128)
+	return ReauthKeys{
+		MSK:  keyBlock[0:64],
+		EMSK: keyBlock[64:128],
+	}, nil
 }
 
 // -----------------------------------------------------------------------------

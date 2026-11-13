@@ -1,0 +1,66 @@
+{
+  "source": "hostap hostap_2_12 (831364bf02710ad09c2f27d3efa92abeeb5634c0): eap_aka_prime_derive_ck_ik_prime, eap_aka_prime_derive_keys",
+  "generator": "tools/vectorgen/vectorgen.c",
+  "cases": [
+    {
+      "name": "aka_prime_full_rfc9048_case1",
+      "identity": "0555444333222111",
+      "network_name": "WLAN",
+      "autn": "bb52e91c747ac3ab2a5c23d15ee351d5",
+      "ik": "9744871ad32bf9bbd1dd5ce54e3e2e5a",
+      "ck": "5349fbe098649f948f5d2e973a81c00f",
+      "ik_prime": "ccfc230ca74fcc96c0a5d61164f5a76c",
+      "ck_prime": "0093962d0dd84aa5684b045c9edffa04",
+      "k_encr": "766fa0a6c317174b812d52fbcd11a179",
+      "k_aut": "0842ea722ff6835bfa2032499fc3ec23c2f0e388b4f07543ffc677f1696d71ea",
+      "k_re": "cf83aa8bc7e0aced892acc98e76a9b2095b558c7795c7094715cb3393aa7d17a",
+      "msk": "67c42d9aa56c1b79e295e3459fc3d187d42be0bf818d3070e362c5e967a4d544e8ecfe19358ab3039aff03b7c930588c055babee58a02650b067ec4e9347c75a",
+      "emsk": "f861703cd775590e16c7679ea3874ada866311de290764d760cf76df647ea01c313f69924bdd7650ca9bac141ea075c4ef9e8029c0e290cdbad5638b63bc23fb"
+    },
+    {
+      "name": "aka_prime_full_nai",
+      "identity": "6555444333222111@wlan.mnc001.mcc001.3gppnetwork.org",
+      "network_name": "WLAN",
+      "autn": "000102030405060708090a0b0c0d0e0f",
+      "ik": "202122232425262728292a2b2c2d2e2f",
+      "ck": "303132333435363738393a3b3c3d3e3f",
+      "ik_prime": "760df3b6eaa0cb8284a0cb207f9c9f64",
+      "ck_prime": "54c69cdc84f78a315a7798fa8e6e8e3b",
+      "k_encr": "e334f987d7c3327b297862c3cdcf8aa8",
+      "k_aut": "4e43a8685121f70c46ed33e2dba7f83f056e62011eb091fd3c1909d2c00f8a0b",
+      "k_re": "06a3af1376947dbdaa61286eb39d7bcc7f23fc342447edd04a0c7afd7bf71dbc",
+      "msk": "522b69bb233c1c1b4cb7cd07c69e46164968e5a98134a5aa86254d47b97f1634d764a2a2e40467b4074cb48db068e38d7e46589ccf653e4487953bbbd4b4c5d7",
+      "emsk": "3ab57621fa421a071f97f3ce873ff796ab353f1b41430f42e6e75164150ea2a999decb0802d1e05ffd531433cd37ea762f29b9f59a1317e6e798c9c04bf98f66"
+    },
+    {
+      "name": "aka_prime_full_5g_network_name",
+      "identity": "0555444333222111",
+      "network_name": "5G:mnc001.mcc001.3gppnetwork.org",
+      "autn": "a0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
+      "ik": "404142434445464748494a4b4c4d4e4f",
+      "ck": "505152535455565758595a5b5c5d5e5f",
+      "ik_prime": "844002fb79d63a72704f88c9e64fbe1e",
+      "ck_prime": "12e1bca838b59a60cd87332a351c86fc",
+      "k_encr": "17aa47851a1a62859ff2c755204acea7",
+      "k_aut": "a44492cec634863093def66dcd0420dc6544d8a3537ad97883699d16de2a8370",
+      "k_re": "89a0178622be177ed440153074109832bb07320fc97c46fb62c91181d44d0709",
+      "msk": "f336e4ad49bfa04b57352d2d09f68cb09877b4253675113dfe309c2920b226942b910e38259376b27eab4451e70c20cc49f70064864bb2fad96cf7a92c049674",
+      "emsk": "04e69d09ce838e6fb456afd0c8ac6cdcf40e8d39f408cd98086d3f8f9dce611225a94c929d0d71e55295b622212bf7c6ef3d9b69b2edae3408d1f1c0bac508bd"
+    },
+    {
+      "name": "aka_prime_full_long_identity",
+      "identity": "40000000000000000000000000000000000000000000000000000000000000000000000000000001@wlan.mnc001.mcc001.3gppnetwork.org",
+      "network_name": "WLAN",
+      "autn": "ffffffffffff00000000000000000000",
+      "ik": "a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5",
+      "ck": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+      "ik_prime": "87577577c76d39630e4af2b67d8b85de",
+      "ck_prime": "6550fdd2d6ec066da7b63ec98dd812a2",
+      "k_encr": "1301c7d7e55ad64eb57944be796821c6",
+      "k_aut": "45f13eece1c8c54c990f9209dde072d2c49e51324aad756cff947bfadf70c8ee",
+      "k_re": "a583aacf9a5d8d8ec4992230a54d7a7c9d2e6a4bc70fe51fcd8c208a91169549",
+      "msk": "f08014a3892bd491a264d502c1a902305762bddfbe578e4587fea93447e8a90c6d18873d39bb8ab5db545bc640e1d0c33d1611e989daf2557b46c23a00e254b7",
+      "emsk": "8e1367a932f447666397316dfa99aaf68c4d8345d66bd38c7efd91b4db9b27d73a787b09f945a2eba7b84c9f96822090f50d10aa9508112a561d541638c254c2"
+    }
+  ]
+}

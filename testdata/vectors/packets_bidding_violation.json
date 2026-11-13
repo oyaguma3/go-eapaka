@@ -1,0 +1,17 @@
+{
+  "source": "hostap hostap_2_12 (831364bf02710ad09c2f27d3efa92abeeb5634c0): eap_sim_msg_*, eap_sim_add_mac_sha256, eap_sim_verify_mac_sha256; AT_BIDDING in EAP-AKA' packets, which RFC 9048 Section 4 does not allow, built on purpose",
+  "generator": "tools/vectorgen/vectorgen.c",
+  "cases": [
+    {
+      "name": "aka_prime_challenge_bidding",
+      "method": "aka_prime",
+      "k_encr": "766fa0a6c317174b812d52fbcd11a179",
+      "k_aut": "0842ea722ff6835bfa2032499fc3ec23c2f0e388b4f07543ffc677f1696d71ea",
+      "iv": "",
+      "plaintext": "",
+      "extra": "",
+      "mac": "63e0d04971cc487891f7bfd99659132e",
+      "packet": "014000543201000001050000101112131415161718191a1b1c1d1e1f02050000202122232425262728292a2b2c2d2e2f1801000117020004574c414e880180000b05000063e0d04971cc487891f7bfd99659132e"
+    }
+  ]
+}

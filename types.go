@@ -58,6 +58,17 @@ const (
 	AT_BIDDING           AttributeType = 136 // RFC 9048 Section 4 (format)
 )
 
+// IsSkippable reports whether attributes of type t are skippable, that is,
+// whether t is in the range 128-255 (RFC 4187 Section 8.1).
+//
+// An unrecognized skippable attribute is ignored. An unrecognized
+// non-skippable attribute (0-127) terminates the exchange: a peer sends
+// EAP-Response/AKA-Client-Error, and a server sends
+// EAP-Request/AKA-Notification with a general failure code.
+func IsSkippable(t AttributeType) bool {
+	return t >= 128
+}
+
 // AT_KDF values (RFC 9048 Section 8.3).
 const (
 	KDFReserved         uint16 = 0
