@@ -257,7 +257,7 @@ func TestVectors_Packets_ParseMarshal(t *testing.T) {
 
 // TestVectors_Packets_Mac は既存の VerifyMac・CalculateAndSetMac（追加データなし）を
 // hostap の MAC と照合する。追加データを使うパケットでは、追加データなしの検証が
-// 失敗することだけを確かめる（追加データ付きの MAC は P0-4 で検証する）。
+// 失敗することだけを確かめる（追加データ付きの MAC は mac_extra_test.go で検証する）。
 func TestVectors_Packets_Mac(t *testing.T) {
 	for _, v := range loadVectors[packetVector](t, "packets.json") {
 		t.Run(v.Name, func(t *testing.T) {
